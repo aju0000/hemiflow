@@ -1,0 +1,24 @@
+# Git Ignore for HemiFlow Agency OS
+
+# Local Databases
+agency_os.db
+*.sqlite
+*.sqlite3
+
+# Temporary & Scratch Files
+scratch/
+temp/
+*.log
+
+# Compressed archives
+*.zip
+*.tar.gz
+
+# Node / Dependencies
+node_modules/
+
+# OS / IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
