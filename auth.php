@@ -51,6 +51,7 @@ function loginUser($username, $password, $requiredModule = null) {
         ];
     }
 
+    
     // Set Session
     $_SESSION['user'] = [
         'id' => $user['id'],
