@@ -67,7 +67,7 @@ try {
             $roleId = intval($_GET['role_id'] ?? 0);
             $dept = $_GET['department'] ?? null;
 
-            $sql = "SELECT u.id, u.username, u.full_name, u.email, u.role_id, r.name as role_name, u.department, u.is_active, u.created_at
+            $sql = "SELECT u.id, u.username, u.full_name, u.email, u.role_id, r.name as role_name, u.department, u.is_active, u.signup_token, u.created_at
                     FROM users u
                     JOIN roles r ON u.role_id = r.id
                     WHERE 1=1";
@@ -86,9 +86,59 @@ try {
             echo json_encode(['success' => true, 'users' => $stmt->fetchAll()]);
             break;
 
+        case 'get_departments':
+            checkAuth();
+            try {
+                $stmt = $db->query("SELECT * FROM departments ORDER BY name ASC");
+                $depts = $stmt->fetchAll();
+            } catch (Exception $e) {
+                $depts = [];
+            }
+            if (empty($depts)) {
+                $defaultNames = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analytics', 'Support', 'Quality Assurance', 'Marketing'];
+                $depts = array_map(function($d) { return ['name' => $d]; }, $defaultNames);
+            }
+            echo json_encode(['success' => true, 'departments' => $depts]);
+            break;
+
+        case 'create_department':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $deptName = trim($input['name'] ?? '');
+            if (empty($deptName)) {
+                echo json_encode(['success' => false, 'message' => 'Department name is required.']);
+                exit;
+            }
+
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can create departments.']);
+                exit;
+            }
+
+            try {
+                $db->exec("CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) UNIQUE NOT NULL, created_by INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                $stmtIns = $db->prepare("INSERT INTO departments (name, created_by) VALUES (?, ?)");
+                $stmtIns->execute([$deptName, $currentUser['id']]);
+                logActivity($currentUser['id'], 'user-management', 'CREATE_DEPARTMENT', 'departments', $db->lastInsertId(), "Created department '{$deptName}'");
+                echo json_encode(['success' => true, 'name' => $deptName, 'message' => "Department '{$deptName}' created successfully!"]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => "Department '{$deptName}' already exists or failed to save."]);
+            }
+            break;
+
         case 'create_user':
             checkAuth();
             $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can create user accounts.']);
+                exit;
+            }
 
             $username = trim($input['username'] ?? '');
             $password = trim($input['password'] ?? '');
@@ -96,9 +146,16 @@ try {
             $email = trim($input['email'] ?? '');
             $roleId = intval($input['role_id'] ?? 0);
             $department = trim($input['department'] ?? 'General');
+            $allowSelfSignup = !empty($input['set_own_password']);
 
-            if (empty($username) || empty($password) || empty($fullName) || empty($email) || !$roleId) {
-                echo json_encode(['success' => false, 'message' => 'Username, Password, Full Name, Email, and Role are required.']);
+            if (empty($username) || empty($fullName) || empty($email) || !$roleId) {
+                echo json_encode(['success' => false, 'message' => 'Username, Full Name, Email Address, and Role are required.']);
+                exit;
+            }
+
+            // TEAM LEAD SECURITY ENFORCEMENT: Team Leads cannot create Super Admin (role 1) or Team Lead (role 4) accounts!
+            if ($isTeamLead && !$isSuperAdmin && ($roleId == 1 || $roleId == 4)) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads can only create team member roles (Developer, Sales, Agency Admin, etc.) and cannot create Super Admin or Team Lead accounts.']);
                 exit;
             }
 
@@ -116,10 +173,20 @@ try {
                 exit;
             }
 
-            $passHash = password_hash($password, PASSWORD_BCRYPT);
+            $signupToken = null;
+            if ($allowSelfSignup || empty($password)) {
+                $signupToken = bin2hex(random_bytes(16));
+                $passHash = password_hash('PENDING_SIGNUP_' . bin2hex(random_bytes(8)), PASSWORD_BCRYPT);
+            } else {
+                $passHash = password_hash($password, PASSWORD_BCRYPT);
+            }
 
-            $stmtIns = $db->prepare("INSERT INTO users (username, password_hash, full_name, email, role_id, department, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)");
-            $stmtIns->execute([$username, $passHash, $fullName, $email, $roleId, $department]);
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN signup_token VARCHAR(100) DEFAULT NULL");
+            } catch (Exception $e) {}
+
+            $stmtIns = $db->prepare("INSERT INTO users (username, password_hash, full_name, email, role_id, department, signup_token, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+            $stmtIns->execute([$username, $passHash, $fullName, $email, $roleId, $department, $signupToken]);
             $newUserId = $db->lastInsertId();
 
             $modulesToGrant = [];
@@ -144,10 +211,79 @@ try {
 
             logActivity($currentUser['id'], 'user-management', 'CREATE_USER', 'users', $newUserId, "Created user {$username} ({$fullName}) with role ID {$roleId} in department {$department}");
 
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $signupUrl = $signupToken ? "{$protocol}{$host}/signup.php?token={$signupToken}" : null;
+
             echo json_encode([
                 'success' => true,
                 'user_id' => $newUserId,
-                'message' => "User '{$fullName}' ({$username}) created successfully with assigned role & department access!"
+                'signup_token' => $signupToken,
+                'signup_url' => $signupUrl,
+                'message' => $signupToken
+                    ? "User account '{$fullName}' created! Invite link generated so user can create their own password."
+                    : "User account '{$fullName}' ({$username}) created successfully with specified password!"
+            ]);
+            break;
+
+        case 'verify_signup_token':
+            $token = trim($_GET['token'] ?? '');
+            $identifier = trim($_GET['identifier'] ?? '');
+
+            if (empty($token) && empty($identifier)) {
+                echo json_encode(['success' => false, 'message' => 'Token or Username/Email is required.']);
+                exit;
+            }
+
+            if (!empty($token)) {
+                $stmt = $db->prepare("SELECT u.id, u.username, u.full_name, u.email, r.name as role_name, u.department FROM users u JOIN roles r ON u.role_id = r.id WHERE u.signup_token = ?");
+                $stmt->execute([$token]);
+            } else {
+                $stmt = $db->prepare("SELECT u.id, u.username, u.full_name, u.email, r.name as role_name, u.department FROM users u JOIN roles r ON u.role_id = r.id WHERE u.username = ? OR u.email = ?");
+                $stmt->execute([$identifier, $identifier]);
+            }
+            $u = $stmt->fetch();
+
+            if (!$u) {
+                echo json_encode(['success' => false, 'message' => 'Account or signup invite link not found.']);
+                exit;
+            }
+
+            echo json_encode(['success' => true, 'user' => $u]);
+            break;
+
+        case 'complete_signup':
+            $token = trim($input['token'] ?? '');
+            $identifier = trim($input['identifier'] ?? '');
+            $newPassword = trim($input['password'] ?? '');
+
+            if (empty($newPassword) || (empty($token) && empty($identifier))) {
+                echo json_encode(['success' => false, 'message' => 'Valid invite token/username and new password are required.']);
+                exit;
+            }
+
+            if (!empty($token)) {
+                $stmt = $db->prepare("SELECT id, username, full_name FROM users WHERE signup_token = ?");
+                $stmt->execute([$token]);
+            } else {
+                $stmt = $db->prepare("SELECT id, username, full_name FROM users WHERE username = ? OR email = ?");
+                $stmt->execute([$identifier, $identifier]);
+            }
+            $targetUser = $stmt->fetch();
+
+            if (!$targetUser) {
+                echo json_encode(['success' => false, 'message' => 'User account not found or invite token expired.']);
+                exit;
+            }
+
+            $passHash = password_hash($newPassword, PASSWORD_BCRYPT);
+            $stmtUpd = $db->prepare("UPDATE users SET password_hash = ?, signup_token = NULL, is_active = 1 WHERE id = ?");
+            $stmtUpd->execute([$passHash, $targetUser['id']]);
+
+            echo json_encode([
+                'success' => true,
+                'username' => $targetUser['username'],
+                'message' => "Password created successfully! You can now log in with your new password."
             ]);
             break;
 
@@ -201,7 +337,7 @@ try {
             // Clean up user module access & unassign active tasks
             $db->prepare("DELETE FROM user_module_access WHERE user_id = ?")->execute([$targetUserId]);
             $db->prepare("UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?")->execute([$targetUserId]);
-            
+
             // Delete user row
             $stmtDel = $db->prepare("DELETE FROM users WHERE id = ?");
             $stmtDel->execute([$targetUserId]);
