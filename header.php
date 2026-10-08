@@ -12,6 +12,10 @@ $currentScript = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HemiFlow - Management System</title>
+    <!-- Google Sans Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Google+Sans+Text:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <!-- Feather Icons for UI -->
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
@@ -38,35 +42,45 @@ $currentScript = basename($_SERVER['PHP_SELF']);
 
             <div class="nav-label" style="margin-top:15px;">Modules</div>
             
+            <?php if (hasModuleAccess('template-generator')): ?>
             <!-- Module 3: Template Generator -->
             <a href="template_generator.php" class="nav-item <?= $currentScript === 'template_generator.php' ? 'active' : '' ?>">
                 <i data-feather="file-text"></i>
                 <span>Template Generator</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (hasModuleAccess('client-management')): ?>
             <!-- Clients Management -->
             <a href="clients.php" class="nav-item <?= $currentScript === 'clients.php' ? 'active' : '' ?>">
                 <i data-feather="users"></i>
                 <span>Client Management</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (hasModuleAccess('task-management')): ?>
             <!-- Module 4: Project & Task Management (Phase 2 Ready) -->
             <a href="projects.php" class="nav-item <?= $currentScript === 'projects.php' ? 'active' : '' ?>">
                 <i data-feather="check-square"></i>
                 <span>Task Management</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (hasModuleAccess('reports')): ?>
             <!-- Module 9: Reports & Analytics (Phase 3 Ready) -->
             <a href="reports.php" class="nav-item <?= $currentScript === 'reports.php' ? 'active' : '' ?>">
                 <i data-feather="bar-chart-2"></i>
                 <span>Reports & BI</span>
             </a>
+            <?php endif; ?>
 
+            <?php if (hasModuleAccess('user-management')): ?>
             <!-- User Management & Team Leads -->
             <a href="users.php" class="nav-item <?= $currentScript === 'users.php' ? 'active' : '' ?>">
                 <i data-feather="user-check"></i>
                 <span>User Management</span>
             </a>
+            <?php endif; ?>
         </nav>
 
 

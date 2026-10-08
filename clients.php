@@ -26,6 +26,9 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
         <p style="color:var(--text-muted); font-size:14px;">Manage accounts, portal credentials, package subscriptions, and generated document repository.</p>
     </div>
     <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline" onclick="openServicePackagesModal()">
+            <i data-feather="package"></i> Service Packages
+        </button>
         <button class="btn btn-primary" onclick="openAddClientModal()">
             <i data-feather="user-plus"></i> + Add New Client
         </button>
@@ -77,10 +80,20 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
                                 <?= htmlspecialchars($c['status']) ?>
                             </span>
                         </td>
-                        <td><span class="badge badge-secondary"><?= $c['service_count'] ?> Service(s)</span></td>
+                        <td>
+                            <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px; font-size:12px;" onclick="openServicePackagesModal(<?= $c['id'] ?>, '<?= htmlspecialchars(addslashes($c['company_name'])) ?>')">
+                                <i data-feather="package" style="width:12px; height:12px;"></i> <?= $c['service_count'] ?> Package(s)
+                            </button>
+                        </td>
                         <td><span class="badge badge-primary"><?= $c['document_count'] ?> Document(s)</span></td>
                         <td>
                             <div style="display:flex; gap:6px; align-items:center;">
+                                <button type="button" class="btn btn-outline btn-sm" onclick="openEditClientModal(<?= htmlspecialchars(json_encode($c)) ?>)" title="Edit Client Profile">
+                                    <i data-feather="edit-2"></i> Edit Client
+                                </button>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="openServicePackagesModal(<?= $c['id'] ?>, '<?= htmlspecialchars(addslashes($c['company_name'])) ?>')" title="Manage Packages">
+                                    <i data-feather="plus-circle"></i> Packages
+                                </button>
                                 <a href="template_generator.php" class="btn btn-outline btn-sm">Generate Document</a>
                                 <?php if ($user['role'] === 'Super Admin' || ($user['role_id'] ?? 0) == 1): ?>
                                     <button class="btn btn-outline-danger btn-sm" onclick="deleteClientAccount(<?= $c['id'] ?>, '<?= htmlspecialchars(addslashes($c['company_name'])) ?>')" title="Delete Client Account">
@@ -150,6 +163,66 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
                             <label class="form-label">Portal Password (Optional)</label>
                             <input type="text" id="ac_password" class="form-control" placeholder="e.g. AcmePass#2026">
                         </div>
+
+<!-- MODAL: EDIT CLIENT -->
+<div id="editClientModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:650px;">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ Edit Client Profile & Details</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('editClientModal')">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); submitUpdateClient();">
+            <div class="modal-body">
+                <input type="hidden" id="ec_client_id" value="0">
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Company Name *</label>
+                        <input type="text" id="ec_company_name" class="form-control" required placeholder="e.g. Acme Tech Solutions">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Person *</label>
+                        <input type="text" id="ec_contact_person" class="form-control" required placeholder="e.g. John Doe">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Email Address *</label>
+                        <input type="email" id="ec_email" class="form-control" required placeholder="john@acme.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone Number</label>
+                        <input type="text" id="ec_phone" class="form-control" placeholder="+91 98765 43210">
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Tax ID / GSTIN</label>
+                        <input type="text" id="ec_tax_id" class="form-control" placeholder="Tax ID">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Account Status</label>
+                        <select id="ec_status" class="form-select">
+                            <option value="Approved / Active">Approved / Active</option>
+                            <option value="Pending Approval">Pending Approval</option>
+                            <option value="Suspended">Suspended</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Client Notes & Remarks</label>
+                    <textarea id="ec_notes" class="form-control" rows="3" placeholder="Additional client notes..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editClientModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Client Profile</button>
+            </div>
+        </form>
+    </div>
+</div>
                     </div>
                     <small style="color:#0284c7; display:block; margin-top:6px;">If left blank, a unique username (@client_company) and a unique random password (e.g. Client#8942) will be auto-generated.</small>
                 </div>
@@ -159,6 +232,126 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
                 <button type="submit" class="btn btn-primary">Create Client Account</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- MODAL: MANAGE SERVICE PACKAGES -->
+<div id="servicePackagesModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:850px; width:95%;">
+        <div class="modal-header">
+            <h3 class="modal-title">📦 Service Packages Directory & Management</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('servicePackagesModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <!-- Filter & Action Controls -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="font-weight:600; font-size:13px; color:var(--text-muted);">Client Filter:</label>
+                    <select id="sp_filter_client" class="form-select" style="min-width:220px;" onchange="onSpClientFilterChange()">
+                        <option value="0">-- All Clients Service Packages --</option>
+                        <?php foreach ($clients as $c): ?>
+                            <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['company_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="showAddServicePackageForm()">
+                    <i data-feather="plus"></i> + Add Service Package
+                </button>
+            </div>
+
+            <!-- Form Card for Add/Edit -->
+            <div id="sp_form_card" style="display:none; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:18px; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h4 id="sp_form_title" style="margin:0; font-size:15px; color:#0f172a; font-weight:700;">+ Add New Service Package</h4>
+                    <button type="button" class="btn btn-outline btn-sm" style="padding:2px 8px;" onclick="hideServicePackageForm()">&times;</button>
+                </div>
+                <form onsubmit="event.preventDefault(); submitSaveServicePackage();">
+                    <input type="hidden" id="sp_package_id" value="0">
+                    
+                    <div class="form-group">
+                        <label class="form-label">Client Company *</label>
+                        <select id="sp_client_id" class="form-select" required>
+                            <?php foreach ($clients as $c): ?>
+                                <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['company_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Service Name *</label>
+                            <input type="text" id="sp_service_name" class="form-control" required placeholder="e.g. Website Development">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Package Name *</label>
+                            <input type="text" id="sp_package_name" class="form-control" required placeholder="e.g. Corporate Web Suite">
+                        </div>
+                    </div>
+
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Price *</label>
+                            <input type="number" step="0.01" id="sp_price" class="form-control" required placeholder="150000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Currency</label>
+                            <select id="sp_currency" class="form-select">
+                                <option value="INR">INR (₹)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="GBP">GBP (£)</option>
+                                <option value="AED">AED</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Package Status</label>
+                            <select id="sp_status" class="form-select">
+                                <option value="Active">Active</option>
+                                <option value="Paused">Paused</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Billing Terms</label>
+                            <input type="text" id="sp_billing_terms" class="form-control" placeholder="e.g. 50% Advance, 50% on Completion">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Payment Terms</label>
+                            <input type="text" id="sp_payment_terms" class="form-control" placeholder="e.g. Net 15 days from Invoice">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="hideServicePackageForm()">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Save Service Package</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table of Packages -->
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Client</th>
+                            <th>Package Name</th>
+                            <th>Service Category</th>
+                            <th>Price</th>
+                            <th>Terms</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sp_table_body">
+                        <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">Loading service packages...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -189,6 +382,9 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
 </div>
 
 <script>
+let allClients = <?= json_encode($clients) ?>;
+let loadedServices = [];
+
 function openAddClientModal() {
     document.getElementById('ac_company_name').value = '';
     document.getElementById('ac_contact_person').value = '';
@@ -222,6 +418,47 @@ function submitCreateClient() {
     .then(data => {
         if (data.success) {
             closeModal('addClientModal');
+            alert('✅ ' + data.message);
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function openEditClientModal(client) {
+    document.getElementById('ec_client_id').value = client.id;
+    document.getElementById('ec_company_name').value = client.company_name || '';
+    document.getElementById('ec_contact_person').value = client.contact_person || '';
+    document.getElementById('ec_email').value = client.email || '';
+    document.getElementById('ec_phone').value = client.phone || '';
+    document.getElementById('ec_tax_id').value = client.tax_id || '';
+    document.getElementById('ec_status').value = client.status || 'Approved / Active';
+    document.getElementById('ec_notes').value = client.notes || '';
+    document.getElementById('editClientModal').style.display = 'flex';
+}
+
+function submitUpdateClient() {
+    const payload = {
+        client_id: document.getElementById('ec_client_id').value,
+        company_name: document.getElementById('ec_company_name').value,
+        contact_person: document.getElementById('ec_contact_person').value,
+        email: document.getElementById('ec_email').value,
+        phone: document.getElementById('ec_phone').value,
+        tax_id: document.getElementById('ec_tax_id').value,
+        status: document.getElementById('ec_status').value,
+        notes: document.getElementById('ec_notes').value
+    };
+
+    fetch('api.php?action=update_client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('editClientModal');
             alert('✅ ' + data.message);
             window.location.reload();
         } else {
@@ -278,6 +515,157 @@ function deleteClientAccount(clientId, companyName) {
             alert('Error: ' + data.message);
         }
     });
+}
+
+// --- SERVICE PACKAGES MANAGE FUNCTIONS ---
+function openServicePackagesModal(clientId = 0, companyName = '') {
+    const filterSelect = document.getElementById('sp_filter_client');
+    filterSelect.value = clientId;
+    hideServicePackageForm();
+    document.getElementById('servicePackagesModal').style.display = 'flex';
+    loadServicePackages(clientId);
+}
+
+function loadServicePackages(clientId = 0) {
+    fetch(`api.php?action=get_client_services&client_id=${clientId}`)
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            loadedServices = data.services;
+            renderServicePackagesTable(loadedServices);
+        }
+    });
+}
+
+function renderServicePackagesTable(services) {
+    const tbody = document.getElementById('sp_table_body');
+    if (!services || services.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">No service packages found. Click '+ Add Service Package' above to create one!</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = services.map(s => `
+        <tr>
+            <td><strong>${escapeHtml(s.company_name || 'Client #' + s.client_id)}</strong></td>
+            <td><strong>${escapeHtml(s.package_name)}</strong></td>
+            <td><span class="badge badge-primary">${escapeHtml(s.service_name)}</span></td>
+            <td><strong>${s.currency || 'INR'} ${parseFloat(s.price).toLocaleString()}</strong></td>
+            <td>
+                <small style="display:block; color:var(--text-muted);">${escapeHtml(s.billing_terms || 'Standard')}</small>
+                <small style="display:block; color:var(--text-muted);">${escapeHtml(s.payment_terms || 'Net 15')}</small>
+            </td>
+            <td><span class="badge ${s.status === 'Active' ? 'badge-success' : 'badge-secondary'}">${escapeHtml(s.status || 'Active')}</span></td>
+            <td>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="editServicePackage(${s.id})">Edit</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteServicePackage(${s.id}, '${escapeHtml(addslashes(s.package_name))}')">Delete</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    if (window.feather) feather.replace();
+}
+
+function showAddServicePackageForm() {
+    document.getElementById('sp_package_id').value = 0;
+    const filterClientId = document.getElementById('sp_filter_client').value;
+    document.getElementById('sp_client_id').value = filterClientId > 0 ? filterClientId : (allClients[0] ? allClients[0].id : 0);
+    document.getElementById('sp_service_name').value = '';
+    document.getElementById('sp_package_name').value = '';
+    document.getElementById('sp_price').value = '';
+    document.getElementById('sp_currency').value = 'INR';
+    document.getElementById('sp_billing_terms').value = '50% Advance, 50% on Completion';
+    document.getElementById('sp_payment_terms').value = 'Net 15 days';
+    document.getElementById('sp_status').value = 'Active';
+    document.getElementById('sp_form_title').textContent = '+ Add New Service Package';
+    document.getElementById('sp_form_card').style.display = 'block';
+}
+
+function hideServicePackageForm() {
+    document.getElementById('sp_form_card').style.display = 'none';
+}
+
+function editServicePackage(packageId) {
+    const pkg = loadedServices.find(s => s.id == packageId);
+    if (!pkg) return;
+    document.getElementById('sp_package_id').value = pkg.id;
+    document.getElementById('sp_client_id').value = pkg.client_id;
+    document.getElementById('sp_service_name').value = pkg.service_name;
+    document.getElementById('sp_package_name').value = pkg.package_name;
+    document.getElementById('sp_price').value = pkg.price;
+    document.getElementById('sp_currency').value = pkg.currency || 'INR';
+    document.getElementById('sp_billing_terms').value = pkg.billing_terms || '';
+    document.getElementById('sp_payment_terms').value = pkg.payment_terms || '';
+    document.getElementById('sp_status').value = pkg.status || 'Active';
+    document.getElementById('sp_form_title').textContent = '✏️ Edit Service Package #' + pkg.id;
+    document.getElementById('sp_form_card').style.display = 'block';
+}
+
+function submitSaveServicePackage() {
+    const pkgId = document.getElementById('sp_package_id').value;
+    const payload = {
+        id: pkgId,
+        client_id: document.getElementById('sp_client_id').value,
+        service_name: document.getElementById('sp_service_name').value,
+        package_name: document.getElementById('sp_package_name').value,
+        price: document.getElementById('sp_price').value,
+        currency: document.getElementById('sp_currency').value,
+        billing_terms: document.getElementById('sp_billing_terms').value,
+        payment_terms: document.getElementById('sp_payment_terms').value,
+        status: document.getElementById('sp_status').value
+    };
+
+    const action = pkgId > 0 ? 'update_service_package' : 'add_service_package';
+
+    fetch(`api.php?action=${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            hideServicePackageForm();
+            alert('✅ ' + data.message);
+            const currentFilter = document.getElementById('sp_filter_client').value;
+            loadServicePackages(currentFilter);
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function deleteServicePackage(id, packageName) {
+    if (!confirm(`Are you sure you want to delete service package '${packageName}'?`)) return;
+    fetch('api.php?action=delete_service_package', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            const currentFilter = document.getElementById('sp_filter_client').value;
+            loadServicePackages(currentFilter);
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function onSpClientFilterChange() {
+    const clientId = document.getElementById('sp_filter_client').value;
+    loadServicePackages(clientId);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function addslashes(str) {
+    if (!str) return '';
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }

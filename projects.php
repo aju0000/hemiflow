@@ -21,7 +21,7 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
     <div>
         <h2 style="font-size:20px; font-weight:700;">
-            <?= $user['role'] === 'Developer' ? ' My Assigned Tasks Workspace' : '🛠️ Team Lead Project & Task Management Hub' ?>
+            <?= $user['role'] === 'Developer' ? ' My Assigned Tasks Workspace' : 'Team Lead Project & Task Management Hub' ?>
         </h2>
         <p style="color:var(--text-muted); font-size:14px;">
             <?= $user['role'] === 'Developer' 
@@ -229,7 +229,7 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
 <div id="submitWorkModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">⚡ Submit Work for Team Lead Review</h3>
+            <h3 class="modal-title">Submit Work for Team Lead Review</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('submitWorkModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitWork();">
@@ -264,7 +264,7 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
 <div id="reviewWorkModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:650px;">
         <div class="modal-header">
-            <h3 class="modal-title">🛠️ Team Lead Work Review</h3>
+            <h3 class="modal-title">Team Lead Work Review</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('reviewWorkModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitTeamLeadReview();">
@@ -279,8 +279,9 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
                 <div class="form-group">
                     <label class="form-label">Review Action *</label>
                     <select id="rw_action" class="form-select" onchange="onReviewActionChanged()" required>
-                        <option value="APPROVE">✅ APPROVE (Mark Completed / Pass Internal Review)</option>
-                        <option value="REQUEST_REVISION">❌ REQUEST REVISION (Send Back to Developer with Changes Needed)</option>
+                        <option value="APPROVE">APPROVE (Mark Completed / Pass Internal Review)</option>
+                        <option value="REQUEST_REVISION">REQUEST REVISION (Send Back to Developer with Changes Needed)</option>
+                        <option value="SEND_CLIENT_APPROVAL">SEND FOR CLIENT APPROVAL (Send to Client)</option>
                     </select>
                 </div>
 

@@ -153,6 +153,34 @@ require_once __DIR__ . '/header.php';
     </div>
 </div>
 
+<!-- MODAL: CLIENT APPROVAL PROCESS -->
+<div id="clientApprovalModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Process Client Approval</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('clientApprovalModal')">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); submitClientApproval();">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Client Approval Decision *</label>
+                    <select id="ca_status" class="form-select" required>
+                        <option value="Approved">Client Approved (Mark Task Completed)</option>
+                        <option value="Revision Requested">Client Requested Revision (Send Back to Developer)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Client Feedback / Remarks</label>
+                    <textarea id="ca_feedback" class="form-control" rows="3" placeholder="Enter feedback received from client..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('clientApprovalModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Client Decision</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
     const taskId = <?= $taskId ?>;
@@ -226,7 +254,7 @@ require_once __DIR__ . '/header.php';
                         <span style="font-size:11px; color:#64748b;">${c.created_at}</span>
                     </div>
                     <p style="font-size:13px; color:#334155; margin:0; line-height:1.5; white-space:pre-wrap;">${c.comment_text}</p>
-                    ${c.attachment_url ? `<p style="margin-top:6px; font-size:12px;"><a href="${c.attachment_url}" target="_blank" style="color:#2563eb; font-weight:600;">📎 Attachment Deliverable Link</a></p>` : ''}
+                    ${c.attachment_url ? `<p style="margin-top:6px; font-size:12px;"><a href="${c.attachment_url}" target="_blank" style="color:#2563eb; font-weight:600;">Attachment Deliverable Link</a></p>` : ''}
                 </div>
             `;
         });
@@ -306,7 +334,8 @@ require_once __DIR__ . '/header.php';
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('✅ Task status updated to: ' + newStatus);
+                closeModal('clientApprovalModal');
+                alert(data.message);
                 loadTaskDetails();
             } else {
                 alert('Error: ' + data.message);

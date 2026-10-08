@@ -2,7 +2,7 @@
 // users.php - User & Team Lead Management Portal
 
 require_once __DIR__ . '/auth.php';
-checkAuth();
+checkAuth('user-management');
 
 $user = getCurrentUser();
 $db = getDbConnection();
@@ -122,7 +122,7 @@ if (empty($departments)) {
 <div id="createUserModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:650px;">
         <div class="modal-header">
-            <h3 class="modal-title">👤 Create New User Account</h3>
+            <h3 class="modal-title">Create New User / Team Lead Account</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('createUserModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitCreateUser();">
@@ -190,6 +190,10 @@ if (empty($departments)) {
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px; font-size:12px; color:#1e40af;">
+                    <strong>Module Access Auto-Assignment:</strong> Selecting a role will automatically grant relevant module permissions (e.g. Team Leads get Project & Task Management access; Sales Managers get Client & Proposal access).
                 </div>
             </div>
             <div class="modal-footer">
@@ -1135,7 +1139,7 @@ if (empty($departments)) {
         .then(data => {
             if (data.success) {
                 closeModal('resetUserPasswordModal');
-                alert('✅ ' + data.message);
+                alert(data.message);
                 fetchUsersList();
             } else {
                 alert('Error: ' + data.message);
@@ -1156,7 +1160,7 @@ if (empty($departments)) {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('✅ ' + data.message);
+                alert(data.message);
                 fetchUsersList();
             } else {
                 alert('Error: ' + data.message);
@@ -1167,5 +1171,31 @@ if (empty($departments)) {
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     function escapeHtml(t) { return t ? t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : ''; }
 </script>
+
+<!-- MODAL: RESET USER PASSWORD (SUPER ADMIN ONLY) -->
+<div id="resetUserPasswordModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Reset User Account Password</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('resetUserPasswordModal')">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); submitResetUserPassword();">
+            <div class="modal-body">
+                <input type="hidden" id="rup_user_id" value="0">
+                <p style="font-size:13px; color:#475569; margin-bottom:12px;">
+                    Setting new password for <strong id="rup_user_name">User</strong> (<code id="rup_username">@username</code>)
+                </p>
+                <div class="form-group">
+                    <label class="form-label">New Custom Password *</label>
+                    <input type="text" id="rup_new_password" class="form-control" required placeholder="Enter new custom password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('resetUserPasswordModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Password</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

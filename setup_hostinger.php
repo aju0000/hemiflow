@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 file_put_contents(__DIR__ . '/db.php', $dbPhpContent);
 
-                $msg = "🚀 SUCCESS! HemiFlow Database successfully configured and imported into Hostinger MySQL! You can now log in.";
+                $msg = "SUCCESS! HemiFlow Database successfully configured and imported into Hostinger MySQL! You can now log in.";
             }
 
         } catch (Exception $e) {
