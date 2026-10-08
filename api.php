@@ -55,11 +55,150 @@ try {
             echo json_encode(['success' => true, 'user' => $user]);
             break;
 
-        // --- USER MANAGEMENT API ---
+        case 'change_my_password':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $userId = intval($currentUser['id'] ?? 0);
+
+            $currentPassword = trim($input['current_password'] ?? '');
+            $newPassword = trim($input['new_password'] ?? '');
+            $confirmPassword = trim($input['confirm_password'] ?? '');
+
+            if (empty($currentPassword) || empty($newPassword)) {
+                echo json_encode(['success' => false, 'message' => 'Current password and new password are required.']);
+                exit;
+            }
+
+            if (strlen($newPassword) < 6) {
+                echo json_encode(['success' => false, 'message' => 'New password must be at least 6 characters long.']);
+                exit;
+            }
+
+            if (!empty($confirmPassword) && $newPassword !== $confirmPassword) {
+                echo json_encode(['success' => false, 'message' => 'New password and confirmation password do not match.']);
+                exit;
+            }
+
+            $stmtU = $db->prepare("SELECT password_hash, username FROM users WHERE id = ?");
+            $stmtU->execute([$userId]);
+            $u = $stmtU->fetch();
+
+            if (!$u || !password_verify($currentPassword, $u['password_hash'])) {
+                echo json_encode(['success' => false, 'message' => 'Incorrect current password provided.']);
+                exit;
+            }
+
+            $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+            $stmtUpd = $db->prepare("UPDATE users SET password_hash = ?, signup_token = NULL WHERE id = ?");
+            $stmtUpd->execute([$newHash, $userId]);
+
+            logActivity($userId, 'user-management', 'CHANGE_MY_PASSWORD', 'users', $userId, "User '@{$u['username']}' changed their account password");
+
+            echo json_encode(['success' => true, 'message' => 'Your password has been updated successfully!']);
+            break;
+
         case 'get_roles':
             checkAuth();
             $stmt = $db->query("SELECT * FROM roles ORDER BY id ASC");
             echo json_encode(['success' => true, 'roles' => $stmt->fetchAll()]);
+            break;
+
+        case 'create_role':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can create roles.']);
+                exit;
+            }
+
+            $name = trim($input['name'] ?? '');
+            $description = trim($input['description'] ?? '');
+
+            if (empty($name)) {
+                echo json_encode(['success' => false, 'message' => 'Role name is required.']);
+                exit;
+            }
+
+            try {
+                $stmtIns = $db->prepare("INSERT INTO roles (name, description) VALUES (?, ?)");
+                $stmtIns->execute([$name, $description]);
+                $newRoleId = $db->lastInsertId();
+                logActivity($currentUser['id'], 'user-management', 'CREATE_ROLE', 'roles', $newRoleId, "Created role '{$name}'");
+                echo json_encode(['success' => true, 'role_id' => $newRoleId, 'message' => "Role '{$name}' created successfully!"]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => "Role '{$name}' already exists or failed to save."]);
+            }
+            break;
+
+        case 'update_role':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can edit roles.']);
+                exit;
+            }
+
+            $roleId = intval($input['id'] ?? 0);
+            $name = trim($input['name'] ?? '');
+            $description = trim($input['description'] ?? '');
+
+            if (!$roleId || empty($name)) {
+                echo json_encode(['success' => false, 'message' => 'Role ID and Role Name are required.']);
+                exit;
+            }
+
+            if (!$isSuperAdmin && $roleId == 1) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads cannot edit the Super Admin role.']);
+                exit;
+            }
+
+            try {
+                $stmtUpd = $db->prepare("UPDATE roles SET name = ?, description = ? WHERE id = ?");
+                $stmtUpd->execute([$name, $description, $roleId]);
+                logActivity($currentUser['id'], 'user-management', 'UPDATE_ROLE', 'roles', $roleId, "Updated role ID {$roleId} to '{$name}'");
+                echo json_encode(['success' => true, 'message' => "Role '{$name}' updated successfully!"]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => "Failed to update role: " . $e->getMessage()]);
+            }
+            break;
+
+        case 'delete_role':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+
+            if (!$isSuperAdmin) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can delete roles.']);
+                exit;
+            }
+
+            $roleId = intval($input['id'] ?? 0);
+            if ($roleId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid Role ID.']);
+                exit;
+            }
+
+            if (in_array($roleId, [1, 4, 5, 7])) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Core system roles (Super Admin, Team Lead, Developer, Client) cannot be deleted.']);
+                exit;
+            }
+
+            try {
+                $db->prepare("UPDATE users SET role_id = 5 WHERE role_id = ?")->execute([$roleId]);
+                $stmtDel = $db->prepare("DELETE FROM roles WHERE id = ?");
+                $stmtDel->execute([$roleId]);
+
+                logActivity($currentUser['id'], 'user-management', 'DELETE_ROLE', 'roles', $roleId, "Deleted role ID {$roleId}");
+                echo json_encode(['success' => true, 'message' => "Role deleted successfully."]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => "Failed to delete role: " . $e->getMessage()]);
+            }
             break;
 
         case 'get_users':
@@ -127,6 +266,374 @@ try {
             } catch (Exception $e) {
                 echo json_encode(['success' => false, 'message' => "Department '{$deptName}' already exists or failed to save."]);
             }
+            break;
+
+        case 'update_department':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can edit departments.']);
+                exit;
+            }
+
+            $deptId = intval($input['id'] ?? 0);
+            $oldName = trim($input['old_name'] ?? '');
+            $newName = trim($input['name'] ?? ($input['new_name'] ?? ''));
+
+            if (empty($newName)) {
+                echo json_encode(['success' => false, 'message' => 'New department name is required.']);
+                exit;
+            }
+
+            try {
+                if ($deptId > 0) {
+                    $stmtGet = $db->prepare("SELECT name FROM departments WHERE id = ?");
+                    $stmtGet->execute([$deptId]);
+                    $oldName = $stmtGet->fetchColumn() ?: $oldName;
+
+                    $stmtUpd = $db->prepare("UPDATE departments SET name = ? WHERE id = ?");
+                    $stmtUpd->execute([$newName, $deptId]);
+                } elseif (!empty($oldName)) {
+                    $stmtUpd = $db->prepare("UPDATE departments SET name = ? WHERE name = ?");
+                    $stmtUpd->execute([$newName, $oldName]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Department ID or current name required.']);
+                    exit;
+                }
+
+                if (!empty($oldName)) {
+                    $stmtUsers = $db->prepare("UPDATE users SET department = ? WHERE department = ?");
+                    $stmtUsers->execute([$newName, $oldName]);
+                }
+
+                logActivity($currentUser['id'], 'user-management', 'UPDATE_DEPARTMENT', 'departments', $deptId, "Renamed department '{$oldName}' to '{$newName}'");
+                echo json_encode(['success' => true, 'message' => "Department renamed to '{$newName}' successfully!"]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => "Failed to update department: " . $e->getMessage()]);
+            }
+            break;
+
+        case 'delete_department':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can delete departments.']);
+                exit;
+            }
+
+            $deptId = intval($input['id'] ?? 0);
+            $deptName = trim($input['name'] ?? '');
+
+            if ($deptId > 0) {
+                $stmtGet = $db->prepare("SELECT name FROM departments WHERE id = ?");
+                $stmtGet->execute([$deptId]);
+                $deptName = $stmtGet->fetchColumn() ?: $deptName;
+                $stmtDel = $db->prepare("DELETE FROM departments WHERE id = ?");
+                $stmtDel->execute([$deptId]);
+            } elseif (!empty($deptName)) {
+                $stmtDel = $db->prepare("DELETE FROM departments WHERE name = ?");
+                $stmtDel->execute([$deptName]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Department ID or name required.']);
+                exit;
+            }
+
+            if (!empty($deptName)) {
+                $stmtRes = $db->prepare("UPDATE users SET department = 'General' WHERE department = ?");
+                $stmtRes->execute([$deptName]);
+            }
+
+            logActivity($currentUser['id'], 'user-management', 'DELETE_DEPARTMENT', 'departments', $deptId, "Deleted department '{$deptName}'");
+            echo json_encode(['success' => true, 'message' => "Department '{$deptName}' deleted successfully."]);
+            break;
+
+        case 'create_user':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can create user accounts.']);
+                exit;
+            }
+
+            $username = trim($input['username'] ?? '');
+            $password = trim($input['password'] ?? '');
+            $fullName = trim($input['full_name'] ?? '');
+            $email = trim($input['email'] ?? '');
+            $roleId = intval($input['role_id'] ?? 0);
+            $department = trim($input['department'] ?? 'General');
+            $allowSelfSignup = !empty($input['set_own_password']);
+
+            if (empty($username) || empty($fullName) || empty($email) || !$roleId) {
+                echo json_encode(['success' => false, 'message' => 'Username, Full Name, Email Address, and Role are required.']);
+                exit;
+            }
+
+            // TEAM LEAD SECURITY ENFORCEMENT: Team Leads cannot create Super Admin (role 1) or Team Lead (role 4) accounts!
+            if ($isTeamLead && !$isSuperAdmin && ($roleId == 1 || $roleId == 4)) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads can only create team member roles (Developer, Sales, Agency Admin, etc.) and cannot create Super Admin or Team Lead accounts.']);
+                exit;
+            }
+
+            $stmtCheckU = $db->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
+            $stmtCheckU->execute([$username]);
+            if ($stmtCheckU->fetchColumn() > 0) {
+                echo json_encode(['success' => false, 'message' => "Username '{$username}' is already taken."]);
+                exit;
+            }
+
+            $stmtCheckE = $db->prepare("SELECT COUNT(*) FROM users WHERE email = ?");
+            $stmtCheckE->execute([$email]);
+            if ($stmtCheckE->fetchColumn() > 0) {
+                echo json_encode(['success' => false, 'message' => "Email '{$email}' is already registered."]);
+                exit;
+            }
+
+            $signupToken = null;
+            if ($allowSelfSignup || empty($password)) {
+                $signupToken = bin2hex(random_bytes(16));
+                $passHash = password_hash('PENDING_SIGNUP_' . bin2hex(random_bytes(8)), PASSWORD_BCRYPT);
+            } else {
+                $passHash = password_hash($password, PASSWORD_BCRYPT);
+            }
+
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN signup_token VARCHAR(100) DEFAULT NULL");
+            } catch (Exception $e) {}
+
+            $stmtIns = $db->prepare("INSERT INTO users (username, password_hash, full_name, email, role_id, department, signup_token, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+            $stmtIns->execute([$username, $passHash, $fullName, $email, $roleId, $department, $signupToken]);
+            $newUserId = $db->lastInsertId();
+
+            $modulesToGrant = [];
+            if ($roleId == 1 || $roleId == 2) {
+                $modulesToGrant = ['sales', 'client-management', 'template-generator', 'task-management', 'reports'];
+            } elseif ($roleId == 3) {
+                $modulesToGrant = ['sales', 'client-management', 'template-generator'];
+            } elseif ($roleId == 4) {
+                $modulesToGrant = ['task-management', 'client-management', 'template-generator'];
+            } elseif ($roleId == 5) {
+                $modulesToGrant = ['task-management'];
+            } elseif ($roleId == 6) {
+                $modulesToGrant = ['reports'];
+            } else {
+                $modulesToGrant = ['task-management'];
+            }
+
+            $stmtAcc = $db->prepare("INSERT INTO user_module_access (user_id, module_code, can_view, can_edit, can_delete) VALUES (?, ?, 1, 1, 0)");
+            foreach ($modulesToGrant as $mCode) {
+                $stmtAcc->execute([$newUserId, $mCode]);
+            }
+
+            logActivity($currentUser['id'], 'user-management', 'CREATE_USER', 'users', $newUserId, "Created user {$username} ({$fullName}) with role ID {$roleId} in department {$department}");
+
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $signupUrl = $signupToken ? "{$protocol}{$host}/signup.php?token={$signupToken}" : null;
+
+            echo json_encode([
+                'success' => true,
+                'user_id' => $newUserId,
+                'signup_token' => $signupToken,
+                'signup_url' => $signupUrl,
+                'message' => $signupToken
+                    ? "User account '{$fullName}' created! Invite link generated so user can create their own password."
+                    : "User account '{$fullName}' ({$username}) created successfully with specified password!"
+            ]);
+            break;
+
+        case 'update_user':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can edit user accounts.']);
+                exit;
+            }
+
+            $targetUserId = intval($input['user_id'] ?? 0);
+            $fullName = trim($input['full_name'] ?? '');
+            $email = trim($input['email'] ?? '');
+            $roleId = intval($input['role_id'] ?? 0);
+            $department = trim($input['department'] ?? 'General');
+
+            if (!$targetUserId || empty($fullName) || empty($email) || !$roleId) {
+                echo json_encode(['success' => false, 'message' => 'User ID, Full Name, Email, and Role are required.']);
+                exit;
+            }
+
+            $stmtU = $db->prepare("SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?");
+            $stmtU->execute([$targetUserId]);
+            $targetUser = $stmtU->fetch();
+
+            if (!$targetUser) {
+                echo json_encode(['success' => false, 'message' => 'User account not found.']);
+                exit;
+            }
+
+            if (!$isSuperAdmin && ($targetUser['role_id'] == 1 || $targetUser['role_name'] === 'Super Admin')) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads cannot edit Super Admin accounts.']);
+                exit;
+            }
+
+            if (!$isSuperAdmin && ($roleId == 1 || $roleId == 4)) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads cannot assign Super Admin or Team Lead roles.']);
+                exit;
+            }
+
+            if ($email !== $targetUser['email']) {
+                $stmtCheckE = $db->prepare("SELECT COUNT(*) FROM users WHERE email = ? AND id != ?");
+                $stmtCheckE->execute([$email, $targetUserId]);
+                if ($stmtCheckE->fetchColumn() > 0) {
+                    echo json_encode(['success' => false, 'message' => "Email '{$email}' is already in use by another account."]);
+                    exit;
+                }
+            }
+
+            $stmtUpd = $db->prepare("UPDATE users SET full_name = ?, email = ?, role_id = ?, department = ? WHERE id = ?");
+            $stmtUpd->execute([$fullName, $email, $roleId, $department, $targetUserId]);
+
+            if ($roleId != $targetUser['role_id']) {
+                $db->prepare("DELETE FROM user_module_access WHERE user_id = ?")->execute([$targetUserId]);
+                $modulesToGrant = [];
+                if ($roleId == 1 || $roleId == 2) {
+                    $modulesToGrant = ['sales', 'client-management', 'template-generator', 'task-management', 'reports'];
+                } elseif ($roleId == 3) {
+                    $modulesToGrant = ['sales', 'client-management', 'template-generator'];
+                } elseif ($roleId == 4) {
+                    $modulesToGrant = ['task-management', 'client-management', 'template-generator'];
+                } elseif ($roleId == 5) {
+                    $modulesToGrant = ['task-management'];
+                } elseif ($roleId == 6) {
+                    $modulesToGrant = ['reports'];
+                } else {
+                    $modulesToGrant = ['task-management'];
+                }
+                $stmtAcc = $db->prepare("INSERT INTO user_module_access (user_id, module_code, can_view, can_edit, can_delete) VALUES (?, ?, 1, 1, 0)");
+                foreach ($modulesToGrant as $mCode) {
+                    $stmtAcc->execute([$targetUserId, $mCode]);
+                }
+            }
+
+            logActivity($currentUser['id'], 'user-management', 'UPDATE_USER', 'users', $targetUserId, "Updated user details for '@{$targetUser['username']}'");
+            echo json_encode(['success' => true, 'message' => "User '@{$targetUser['username']}' updated successfully."]);
+            break;
+
+        case 'import_users':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+            $isTeamLead = ($currentUser['role'] === 'Team Lead' || ($currentUser['role_id'] ?? 0) == 4);
+
+            if (!$isSuperAdmin && !$isTeamLead) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admins and Team Leads can import users.']);
+                exit;
+            }
+
+            $usersList = $input['users'] ?? [];
+            $setOwnPassword = !empty($input['set_own_password']);
+            $defaultPassword = trim($input['default_password'] ?? 'Welcome@123');
+
+            if (!is_array($usersList) || empty($usersList)) {
+                echo json_encode(['success' => false, 'message' => 'No user data provided for import.']);
+                exit;
+            }
+
+            $rolesList = $db->query("SELECT id, name FROM roles")->fetchAll();
+            $roleMap = [];
+            foreach ($rolesList as $r) {
+                $roleMap[strtolower(trim($r['name']))] = intval($r['id']);
+            }
+
+            $imported = 0;
+            $skipped = 0;
+            $errors = [];
+
+            foreach ($usersList as $idx => $row) {
+                $fullName = trim($row['full_name'] ?? ($row['name'] ?? ''));
+                $email = trim($row['email'] ?? '');
+                $username = trim($row['username'] ?? '');
+                $roleStr = strtolower(trim($row['role'] ?? ($row['role_name'] ?? 'developer')));
+                $department = trim($row['department'] ?? 'General');
+
+                if (empty($fullName) || empty($email)) {
+                    $skipped++;
+                    $errors[] = "Row #" . ($idx + 1) . ": Name and Email are required.";
+                    continue;
+                }
+
+                if (empty($username)) {
+                    $parts = explode('@', $email);
+                    $username = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $parts[0]));
+                }
+
+                $roleId = $roleMap[$roleStr] ?? 5;
+
+                if ($isTeamLead && !$isSuperAdmin && ($roleId == 1 || $roleId == 4)) {
+                    $roleId = 5;
+                }
+
+                $stmtCheck = $db->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
+                $stmtCheck->execute([$username, $email]);
+                if ($stmtCheck->fetch()) {
+                    $skipped++;
+                    $errors[] = "Row #" . ($idx + 1) . ": User with email '{$email}' or username '{$username}' already exists.";
+                    continue;
+                }
+
+                $signupToken = null;
+                if ($setOwnPassword) {
+                    $signupToken = bin2hex(random_bytes(16));
+                    $passHash = password_hash('PENDING_SIGNUP_' . bin2hex(random_bytes(8)), PASSWORD_BCRYPT);
+                } else {
+                    $passHash = password_hash($defaultPassword, PASSWORD_BCRYPT);
+                }
+
+                try {
+                    $stmtIns = $db->prepare("INSERT INTO users (username, password_hash, full_name, email, role_id, department, signup_token, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+                    $stmtIns->execute([$username, $passHash, $fullName, $email, $roleId, $department, $signupToken]);
+                    $newId = $db->lastInsertId();
+
+                    $modulesToGrant = ($roleId == 1 || $roleId == 2) 
+                        ? ['sales', 'client-management', 'template-generator', 'task-management', 'reports']
+                        : ['task-management'];
+                    $stmtAcc = $db->prepare("INSERT INTO user_module_access (user_id, module_code, can_view, can_edit, can_delete) VALUES (?, ?, 1, 1, 0)");
+                    foreach ($modulesToGrant as $mCode) {
+                        $stmtAcc->execute([$newId, $mCode]);
+                    }
+
+                    if (!empty($department) && $department !== 'General') {
+                        try {
+                            $stmtDept = $db->prepare("INSERT OR IGNORE INTO departments (name, created_by) VALUES (?, ?)");
+                            $stmtDept->execute([$department, $currentUser['id']]);
+                        } catch (Exception $ex) {}
+                    }
+
+                    $imported++;
+                } catch (Exception $e) {
+                    $skipped++;
+                    $errors[] = "Row #" . ($idx + 1) . " ('{$email}'): " . $e->getMessage();
+                }
+            }
+
+            logActivity($currentUser['id'], 'user-management', 'IMPORT_USERS', 'users', 0, "Bulk imported {$imported} users ({$skipped} skipped)");
+            echo json_encode([
+                'success' => true,
+                'imported' => $imported,
+                'skipped' => $skipped,
+                'errors' => $errors,
+                'message' => "Successfully imported {$imported} user account(s)." . ($skipped > 0 ? " {$skipped} row(s) skipped." : "")
+            ]);
             break;
 
         case 'create_user':
@@ -289,14 +796,24 @@ try {
 
         case 'toggle_user_status':
             checkAuth();
+            $currentUser = getCurrentUser();
+            $isSuperAdmin = ($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1);
+
             $targetUserId = intval($input['user_id'] ?? 0);
-            $stmt = $db->prepare("SELECT is_active, username FROM users WHERE id = ?");
+            $stmt = $db->prepare("SELECT u.is_active, u.username, u.role_id, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?");
             $stmt->execute([$targetUserId]);
             $u = $stmt->fetch();
             if (!$u) {
                 echo json_encode(['success' => false, 'message' => 'User not found.']);
                 exit;
             }
+
+            // TEAM LEAD SECURITY ENFORCEMENT: Team Leads cannot modify Super Admin accounts!
+            if (!$isSuperAdmin && ($u['role_id'] == 1 || $u['role_name'] === 'Super Admin')) {
+                echo json_encode(['success' => false, 'message' => 'Security Error: Team Leads cannot modify or change status of Super Admin accounts.']);
+                exit;
+            }
+
             $newStatus = $u['is_active'] ? 0 : 1;
             $stmtUpd = $db->prepare("UPDATE users SET is_active = ? WHERE id = ?");
             $stmtUpd->execute([$newStatus, $targetUserId]);
@@ -866,12 +1383,17 @@ try {
             $user = getCurrentUser();
 
             $docId = intval($input['document_id'] ?? 0);
+            if ($docId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid or unsaved document ID. Please save the generated document first.']);
+                exit;
+            }
+
             $stmtDoc = $db->prepare("SELECT d.*, c.company_name, c.contact_person, c.email as client_email, c.phone as client_phone, c.id as client_id FROM documents d JOIN clients c ON d.client_id = c.id WHERE d.id = ?");
             $stmtDoc->execute([$docId]);
             $doc = $stmtDoc->fetch();
 
             if (!$doc) {
-                echo json_encode(['success' => false, 'message' => 'Document not found.']);
+                echo json_encode(['success' => false, 'message' => 'Document not found in system. Please save the document before submitting handover.']);
                 exit;
             }
 
@@ -879,49 +1401,120 @@ try {
             $description = trim($input['description'] ?? ("Work Requirement Handover from approved document {$doc['document_number']}.\nClient: {$doc['company_name']}"));
             $priority = $input['priority'] ?? 'High';
             $deadline = $input['deadline'] ?? date('Y-m-d', strtotime('+14 days'));
-            $teamLeadId = intval($input['team_lead_id'] ?? 3);
+            $teamLeadId = intval($input['team_lead_id'] ?? 0);
 
-            $stmtProj = $db->prepare("INSERT INTO projects (client_id, service_id, project_name, description, priority, status, team_lead_id, deadline, created_by) VALUES (?, ?, ?, ?, ?, 'In Progress', ?, ?, ?)");
-            $stmtProj->execute([$doc['client_id'], $doc['service_id'], $projectName, $description, $priority, $teamLeadId, $deadline, $user['id']]);
-            $projectId = $db->lastInsertId();
+            if ($teamLeadId <= 0) {
+                $stmtFallbackLead = $db->query("SELECT id FROM users WHERE role_id IN (4, 1) ORDER BY role_id ASC LIMIT 1");
+                $teamLeadId = $stmtFallbackLead->fetchColumn() ?: $user['id'];
+            }
 
-            $stmtLink = $db->prepare("UPDATE documents SET handover_project_id = ?, status = 'Approved' WHERE id = ?");
-            $stmtLink->execute([$projectId, $docId]);
-
-            $stmtCli = $db->prepare("UPDATE clients SET status = 'Approved / Active' WHERE id = ?");
-            $stmtCli->execute([$doc['client_id']]);
-
-            // Auto-provision or link Client Portal user account
-            $clientUser = autoProvisionClientUser($db, $doc['client_id']);
-
-            // Create Client Notification for portal hub
             try {
-                $stmtNotif = $db->prepare("INSERT INTO client_notifications (client_id, project_id, notification_type, title, message, is_read) VALUES (?, ?, 'PROJECT_COMPLETED', 'Project Initiated', ?, 0)");
-                $stmtNotif->execute([
+                $stmtProj = $db->prepare("INSERT INTO projects (client_id, service_id, project_name, description, priority, status, team_lead_id, deadline, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmtProj->execute([
                     $doc['client_id'],
-                    $projectId,
-                    "Your project '{$projectName}' has been handed over to our development team and is now active."
+                    $doc['service_id'],
+                    $projectName,
+                    $description,
+                    $priority,
+                    'In Progress',
+                    $teamLeadId,
+                    $deadline,
+                    $user['id']
+                ]);
+                $projectId = $db->lastInsertId();
+
+                $stmtLink = $db->prepare("UPDATE documents SET handover_project_id = ?, status = 'Approved' WHERE id = ?");
+                $stmtLink->execute([$projectId, $docId]);
+
+                $stmtCli = $db->prepare("UPDATE clients SET status = 'Approved / Active' WHERE id = ?");
+                $stmtCli->execute([$doc['client_id']]);
+
+                // Auto-create initial Work Order Task assigned to Team Lead for execution & delegation
+                try {
+                    $taskCode = 'TSK-' . strtoupper(substr(md5(uniqid()), 0, 5));
+                    $slaHours = 48;
+                    $slaDueTime = date('Y-m-d H:i:s', time() + ($slaHours * 3600));
+
+                    $stmtTask = $db->prepare("INSERT INTO tasks (project_id, task_code, title, description, assigned_to, priority, sla_hours, sla_due_time, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)");
+                    $stmtTask->execute([
+                        $projectId,
+                        $taskCode,
+                        "Handover Execution: " . $doc['title'],
+                        $description,
+                        $teamLeadId,
+                        $priority,
+                        $slaHours,
+                        $slaDueTime,
+                        $user['id']
+                    ]);
+                } catch (Exception $eTask) {}
+
+                // Auto-provision or link Client Portal user account
+                $clientUser = autoProvisionClientUser($db, $doc['client_id']);
+
+                // Create Client Notification for portal hub
+                try {
+                    $stmtNotif = $db->prepare("INSERT INTO client_notifications (client_id, project_id, notification_type, title, message, is_read) VALUES (?, ?, 'PROJECT_COMPLETED', 'Project Initiated', ?, 0)");
+                    $stmtNotif->execute([
+                        $doc['client_id'],
+                        $projectId,
+                        "Your project '{$projectName}' has been handed over to our development team and is now active."
+                    ]);
+                } catch (Exception $e) {
+                    // Ignore optional notification errors
+                }
+
+                logActivity($user['id'], 'template-generator', 'HANDOVER_TO_DEVELOPMENT', 'projects', $projectId, "Handed over document #{$doc['document_number']} to Development Team Lead");
+
+                $msg = "Client approval confirmed! Work requirement handed over to Development Team Lead. Project #{$projectId} created for {$doc['company_name']}.";
+                if ($clientUser) {
+                    if ($clientUser['created']) {
+                        $msg .= " Client Portal user created (@{$clientUser['username']}, Temp Password: {$clientUser['temp_password']}).";
+                    } else {
+                        $msg .= " Client Portal account (@{$clientUser['username']}) active for {$doc['company_name']}.";
+                    }
+                }
+
+                echo json_encode([
+                    'success' => true,
+                    'project_id' => $projectId,
+                    'client_user' => $clientUser,
+                    'message' => $msg
                 ]);
             } catch (Exception $e) {
-                // Ignore optional notification errors
+                echo json_encode(['success' => false, 'message' => 'Handover DB error: ' . $e->getMessage()]);
+            }
+            break;
+
+        case 'reassign_task':
+            checkAuth('task-management');
+            $currentUser = getCurrentUser();
+
+            $taskId = intval($input['task_id'] ?? 0);
+            $assignedTo = intval($input['assigned_to'] ?? 0);
+
+            if (!$taskId || !$assignedTo) {
+                echo json_encode(['success' => false, 'message' => 'Task ID and Target User/Developer are required.']);
+                exit;
             }
 
-            logActivity($user['id'], 'template-generator', 'HANDOVER_TO_DEVELOPMENT', 'projects', $projectId, "Handed over document #{$doc['document_number']} to Development Team Lead");
+            $stmtU = $db->prepare("SELECT full_name, username FROM users WHERE id = ?");
+            $stmtU->execute([$assignedTo]);
+            $targetUser = $stmtU->fetch();
 
-            $msg = "Client approval confirmed! Work requirement handed over to Development Team Lead. Project #{$projectId} created for {$doc['company_name']}.";
-            if ($clientUser) {
-                if ($clientUser['created']) {
-                    $msg .= " Client Portal user created (@{$clientUser['username']}, Temp Password: {$clientUser['temp_password']}).";
-                } else {
-                    $msg .= " Client Portal account (@{$clientUser['username']}) active for {$doc['company_name']}.";
-                }
+            if (!$targetUser) {
+                echo json_encode(['success' => false, 'message' => 'Target user account not found.']);
+                exit;
             }
+
+            $stmtUpd = $db->prepare("UPDATE tasks SET assigned_to = ? WHERE id = ?");
+            $stmtUpd->execute([$assignedTo, $taskId]);
+
+            logActivity($currentUser['id'], 'task-management', 'REASSIGN_TASK', 'tasks', $taskId, "Reassigned task #{$taskId} to {$targetUser['full_name']} (@{$targetUser['username']})");
 
             echo json_encode([
                 'success' => true,
-                'project_id' => $projectId,
-                'client_user' => $clientUser,
-                'message' => $msg
+                'message' => "Task reassigned to {$targetUser['full_name']} (@{$targetUser['username']}) successfully!"
             ]);
             break;
 
@@ -1065,6 +1658,42 @@ try {
             logActivity($user['id'], 'task-management', 'CREATE_TASK', 'tasks', $taskId, "Created task {$taskCode}: {$title}");
 
             echo json_encode(['success' => true, 'task_id' => $taskId, 'task_code' => $taskCode, 'message' => "Task #{$taskCode} created and assigned successfully."]);
+            break;
+
+        case 'update_task_status':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+
+            $taskId = intval($input['task_id'] ?? 0);
+            $newStatus = trim($input['status'] ?? '');
+
+            $validStatuses = ['PENDING', 'IN PROGRESS', 'UNDER REVIEW', 'REVISION REQUIRED', 'COMPLETED'];
+            if (!$taskId || !in_array($newStatus, $validStatuses)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid task ID or status value.']);
+                exit;
+            }
+
+            $stmtT = $db->prepare("SELECT * FROM tasks WHERE id = ?");
+            $stmtT->execute([$taskId]);
+            $task = $stmtT->fetch();
+
+            if (!$task) {
+                echo json_encode(['success' => false, 'message' => 'Task not found.']);
+                exit;
+            }
+
+            $oldStatus = $task['status'];
+            $completionTime = ($newStatus === 'COMPLETED') ? date('Y-m-d H:i:s') : $task['completion_time'];
+
+            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, completion_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUpd->execute([$newStatus, $completionTime, $taskId]);
+
+            $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'STATUS_CHANGE', ?, ?, ?)");
+            $stmtAct->execute([$taskId, $user['id'], $oldStatus, $newStatus, "User changed status from {$oldStatus} to {$newStatus}"]);
+
+            logActivity($user['id'], 'task-management', 'UPDATE_TASK_STATUS', 'tasks', $taskId, "Changed task #{$task['task_code']} status from '{$oldStatus}' to '{$newStatus}'");
+
+            echo json_encode(['success' => true, 'new_status' => $newStatus, 'message' => "Task status updated to '{$newStatus}'!"]);
             break;
 
         case 'get_task_details':
