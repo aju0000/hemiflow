@@ -59,15 +59,18 @@ if ($type === 'task_attachment') {
     <head>
         <meta charset="UTF-8">
         <title>' . htmlspecialchars($doc['title']) . ' (' . htmlspecialchars($doc['document_number']) . ')</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Google+Sans+Text:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 40px 20px; color: #0f172a; }
+            body { font-family: "Google Sans", "Google Sans Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 40px 20px; color: #0f172a; }
             .doc-container { max-width: 800px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 40px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
             @media print { body { background: #fff; padding: 0; } .doc-container { border: none; box-shadow: none; padding: 0; } .no-print { display: none; } }
         </style>
     </head>
     <body>
         <div class="no-print" style="max-width:800px; margin:0 auto 20px auto; display:flex; justify-content:space-between; align-items:center;">
-            <button onclick="window.print()" style="background:#2563eb; color:#ffffff; border:none; padding:10px 18px; border-radius:6px; font-weight:700; cursor:pointer;">🖨️ Print / Save as PDF</button>
+            <button onclick="window.print()" style="background:#2563eb; color:#ffffff; border:none; padding:10px 18px; border-radius:6px; font-weight:700; cursor:pointer;">Print / Save as PDF</button>
             <a href="/client/documents.php" style="color:#64748b; text-decoration:none; font-weight:600;">&larr; Back to Documents</a>
         </div>
         <div class="doc-container">
