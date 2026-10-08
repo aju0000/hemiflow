@@ -2,7 +2,7 @@
 // users.php - User & Team Lead Management Portal
 
 require_once __DIR__ . '/auth.php';
-checkAuth();
+checkAuth('user-management');
 
 $user = getCurrentUser();
 $db = getDbConnection();
@@ -98,7 +98,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
 <div id="createUserModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:650px;">
         <div class="modal-header">
-            <h3 class="modal-title">👤 Create New User / Team Lead Account</h3>
+            <h3 class="modal-title">Create New User / Team Lead Account</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('createUserModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitCreateUser();">
@@ -147,7 +147,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
                 </div>
 
                 <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px; font-size:12px; color:#1e40af;">
-                    ⚡ <strong>Module Access Auto-Assignment:</strong> Selecting a role will automatically grant relevant module permissions (e.g. Team Leads get Project & Task Management access; Sales Managers get Client & Proposal access).
+                    <strong>Module Access Auto-Assignment:</strong> Selecting a role will automatically grant relevant module permissions (e.g. Team Leads get Project & Task Management access; Sales Managers get Client & Proposal access).
                 </div>
             </div>
             <div class="modal-footer">
@@ -293,7 +293,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
         .then(data => {
             if (data.success) {
                 closeModal('createUserModal');
-                alert('✅ ' + data.message);
+                alert(data.message);
                 fetchUsersList();
             } else {
                 alert('Error: ' + data.message);
@@ -338,7 +338,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
         .then(data => {
             if (data.success) {
                 closeModal('resetUserPasswordModal');
-                alert('✅ ' + data.message);
+                alert(data.message);
                 fetchUsersList();
             } else {
                 alert('Error: ' + data.message);
@@ -359,7 +359,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('✅ ' + data.message);
+                alert(data.message);
                 fetchUsersList();
             } else {
                 alert('Error: ' + data.message);
@@ -375,7 +375,7 @@ $departments = ['Development', 'Management', 'Sales', 'Design / UI/UX', 'Analyti
 <div id="resetUserPasswordModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:480px;">
         <div class="modal-header">
-            <h3 class="modal-title">🔑 Reset User Account Password</h3>
+            <h3 class="modal-title">Reset User Account Password</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('resetUserPasswordModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitResetUserPassword();">

@@ -25,7 +25,7 @@ $templates = [
         margin: 0;
         padding: 0;
         background: #eeeeee;
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: "Google Sans", "Google Sans Text", system-ui, sans-serif;
         color: #111111;
     }
 
@@ -895,7 +895,7 @@ $templates = [
         'template_name' => 'Official Tax Invoice Template',
         'subject_template' => 'Tax Invoice {{DOCUMENT_NUMBER}} - {{CLIENT_COMPANY}}',
         'variables_json' => json_encode(['DOCUMENT_NUMBER', 'CLIENT_COMPANY', 'CLIENT_CONTACT', 'SERVICE_NAME', 'SERVICE_PRICE', 'TAX_AMOUNT', 'TOTAL_AMOUNT']),
-        'content_template' => '<div style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        'content_template' => '<div style="font-family: \'Google Sans\', \'Google Sans Text\', \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border: 1px solid #e2e8f0; border-radius: 8px;">
   <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
     <div>
       <h1 style="color: #0f172a; margin: 0; font-size: 28px; font-weight: 800;">TAX INVOICE</h1>
@@ -972,7 +972,7 @@ $templates = [
         'template_name' => 'Official Commercial Quotation',
         'subject_template' => 'Commercial Quotation for {{CLIENT_COMPANY}}',
         'variables_json' => json_encode(['CLIENT_COMPANY', 'SERVICE_NAME', 'PACKAGE_NAME', 'TOTAL_AMOUNT']),
-        'content_template' => '<div style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
+        'content_template' => '<div style="font-family: \'Google Sans\', \'Google Sans Text\', \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
   <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 24px;">
     <div>
       <h2 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800;">COMMERCIAL QUOTATION</h2>
@@ -1021,7 +1021,7 @@ $templates = [
         'template_name' => 'Master Services Agreement (Contract)',
         'subject_template' => 'Master Services Agreement - {{CLIENT_COMPANY}}',
         'variables_json' => json_encode(['CLIENT_COMPANY', 'SERVICE_NAME', 'PACKAGE_NAME', 'TOTAL_AMOUNT']),
-        'content_template' => '<div style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border: 1px solid #cbd5e1; border-radius: 8px;">
+        'content_template' => '<div style="font-family: \'Google Sans\', \'Google Sans Text\', \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border: 1px solid #cbd5e1; border-radius: 8px;">
   <h2 style="text-align: center; color: #0f172a; font-size: 22px; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 24px;">MASTER SERVICES CONTRACT</h2>
   
   <p style="font-size: 14px; line-height: 1.6;">This Master Services Agreement ("Agreement") is entered into on this date <strong>{{CURRENT_DATE}}</strong> by and between <strong>{{AGENCY_NAME}}</strong> ("Service Provider") and <strong>{{CLIENT_COMPANY}}</strong> ("Client").</p>
@@ -1055,7 +1055,7 @@ $templates = [
         'template_name' => 'Service Level Agreement (SLA)',
         'subject_template' => 'SLA & Service Level Agreement - {{CLIENT_COMPANY}}',
         'variables_json' => json_encode(['CLIENT_COMPANY', 'SERVICE_NAME']),
-        'content_template' => '<div style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
+        'content_template' => '<div style="font-family: \'Google Sans\', \'Google Sans Text\', \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
   <h2 style="color: #0f172a; font-size: 22px; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;">SERVICE LEVEL AGREEMENT (SLA)</h2>
   
   <p style="font-size: 14px; color: #475569;"><strong>Client:</strong> {{CLIENT_COMPANY}} | <strong>Date:</strong> {{CURRENT_DATE}} | <strong>Doc Ref:</strong> {{DOCUMENT_NUMBER}}</p>
@@ -1079,7 +1079,7 @@ $templates = [
         'template_name' => 'Minutes of Meeting (MOM)',
         'subject_template' => 'Minutes of Meeting - {{CLIENT_COMPANY}}',
         'variables_json' => json_encode(['CLIENT_COMPANY', 'CLIENT_CONTACT']),
-        'content_template' => '<div style="font-family: \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
+        'content_template' => '<div style="font-family: \'Google Sans\', \'Google Sans Text\', \'Segoe UI\', Helvetica, Arial, sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 8px; border: 1px solid #cbd5e1;">
   <div style="border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px;">
     <h2 style="margin: 0; color: #0f172a; font-size: 22px;">MINUTES OF MEETING (MOM)</h2>
     <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Date: {{CURRENT_DATE}} | Meeting Ref: {{DOCUMENT_NUMBER}}</p>
@@ -1116,4 +1116,4 @@ foreach ($templates as $t) {
     }
 }
 
-echo "✅ Processed {$count} document templates successfully into Agency OS database.\n";
+echo "Processed {$count} document templates successfully into Agency OS database.\n";

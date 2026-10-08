@@ -21,21 +21,36 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
 ?>
 
 <div style="margin-bottom: 30px;">
-    <div style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white; padding: 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="background: linear-gradient(135deg, #0f172a, #1e293b); color: white; padding: 25px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
         <div>
-            <h2 style="font-size: 22px; margin-bottom: 6px;">Welcome back, <?= htmlspecialchars($user['full_name']) ?> 👋</h2>
-            <p style="color: #94a3b8; font-size: 14px;">Role: <strong><?= htmlspecialchars($user['role']) ?></strong> | Department: <strong><?= htmlspecialchars($user['department']) ?></strong></p>
+            <h2 style="font-size: 22px; margin-bottom: 6px;">Welcome back, <?= htmlspecialchars($user['full_name']) ?></h2>
+            <p style="color: #94a3b8; font-size: 14px; margin: 0;">Role: <strong><?= htmlspecialchars($user['role']) ?></strong> | Department: <strong><?= htmlspecialchars($user['department']) ?></strong></p>
         </div>
         <div>
-            <a href="template_generator.php" class="btn btn-primary">
-                <i data-feather="plus"></i> Open Template Generator
-            </a>
+            <?php if (hasModuleAccess('template-generator')): ?>
+                <a href="template_generator.php" class="btn btn-primary">
+                    <i data-feather="plus"></i> Open Template Generator
+                </a>
+            <?php elseif (hasModuleAccess('client-management')): ?>
+                <a href="clients.php" class="btn btn-primary">
+                    <i data-feather="users"></i> View Client Directory
+                </a>
+            <?php elseif (hasModuleAccess('task-management')): ?>
+                <a href="projects.php" class="btn btn-primary">
+                    <i data-feather="check-square"></i> Open Task Hub
+                </a>
+            <?php elseif (hasModuleAccess('reports')): ?>
+                <a href="reports.php" class="btn btn-primary">
+                    <i data-feather="bar-chart-2"></i> View Management Reports
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <!-- Metrics Cards -->
-<div class="grid-4" style="margin-bottom: 30px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <?php if (hasModuleAccess('client-management') || hasModuleAccess('sales')): ?>
     <div class="card" style="margin-bottom:0;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -47,7 +62,9 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
+    <?php if (hasModuleAccess('template-generator')): ?>
     <div class="card" style="margin-bottom:0;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -71,7 +88,9 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
+    <?php if (hasModuleAccess('task-management')): ?>
     <div class="card" style="margin-bottom:0;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -83,6 +102,7 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </div>
         </div>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Accessible Modules Grid -->
@@ -90,7 +110,8 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
     <div class="card-header">
         <h3 class="card-title">System Modules & Roles</h3>
     </div>
-    <div class="grid-3">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+        <?php if (hasModuleAccess('template-generator')): ?>
         <!-- Module 3: Template Generator -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #ffffff;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -104,7 +125,25 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </p>
             <a href="template_generator.php" class="btn btn-primary btn-sm">Launch Module 3</a>
         </div>
+        <?php endif; ?>
 
+        <?php if (hasModuleAccess('client-management')): ?>
+        <!-- Client Management -->
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #ffffff;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <div style="background:#e0f2fe; color:#0284c7; padding:8px; border-radius:6px;">
+                    <i data-feather="users"></i>
+                </div>
+                <h4 style="margin:0; font-size:16px;">Client Management & Repository</h4>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px; line-height:1.5;">
+                Manage corporate clients, contact details, tax identifiers, client portal credentials, and service package subscriptions.
+            </p>
+            <a href="clients.php" class="btn btn-outline btn-sm">View Client Directory</a>
+        </div>
+        <?php endif; ?>
+
+        <?php if (hasModuleAccess('task-management')): ?>
         <!-- Module 4: Project & Task Management -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #ffffff;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -118,7 +157,9 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </p>
             <a href="projects.php" class="btn btn-outline btn-sm">Phase 2 Task Hub</a>
         </div>
+        <?php endif; ?>
 
+        <?php if (hasModuleAccess('reports')): ?>
         <!-- Module 9: Reports & BI -->
         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #ffffff;">
             <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -132,9 +173,27 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
             </p>
             <a href="reports.php" class="btn btn-outline btn-sm">Phase 3 BI Hub</a>
         </div>
+        <?php endif; ?>
+
+        <?php if (hasModuleAccess('user-management')): ?>
+        <!-- User Management -->
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #ffffff;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <div style="background:#fef3c7; color:#d97706; padding:8px; border-radius:6px;">
+                    <i data-feather="user-check"></i>
+                </div>
+                <h4 style="margin:0; font-size:16px;">User & Team Lead Management</h4>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px; line-height:1.5;">
+                System user account management, role assignments, department allocation, and Team Lead provisioning.
+            </p>
+            <a href="users.php" class="btn btn-outline btn-sm">Manage System Users</a>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
+<?php if (hasModuleAccess('template-generator') || hasModuleAccess('sales') || hasModuleAccess('client-management')): ?>
 <!-- Recent Generated Documents -->
 <div class="card">
     <div class="card-header">
@@ -172,5 +231,6 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
         </table>
     </div>
 </div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

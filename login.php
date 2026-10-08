@@ -43,6 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HemiFlow - Portal Login</title>
+    <!-- Google Sans Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Google+Sans+Text:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <style>
@@ -168,22 +172,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Quick Demo Role Switcher -->
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #cbd5e1;">
-            <p style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 10px;">⚡ QUICK DEMO USER LOGIN (Click to autofill):</p>
+            <p style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 10px;">QUICK DEMO USER LOGIN (Click to autofill):</p>
             
             <button type="button" class="quick-user-btn" onclick="fillUser('admin', 'password123')">
-                👑 <strong>Super Admin</strong> (admin) &rarr; All Modules Access
+                <strong>Super Admin</strong> (admin) &rarr; All Modules Access
             </button>
             <button type="button" class="quick-user-btn" onclick="fillUser('sales_john', 'password123')">
-                💼 <strong>Sales Manager</strong> (sales_john) &rarr; Sales, Client & Template Generator
+                <strong>Sales Manager</strong> (sales_john) &rarr; Sales, Client & Template Generator
             </button>
             <button type="button" class="quick-user-btn" onclick="fillUser('lead_ajmal', 'password123')">
-                🛠️ <strong>Team Lead</strong> (lead_ajmal) &rarr; Task & Project Management
+                <strong>Team Lead</strong> (lead_ajmal) &rarr; Task & Project Management
             </button>
             <button type="button" class="quick-user-btn" onclick="fillUser('dev_rahul', 'password123')">
-                💻 <strong>Developer</strong> (dev_rahul) &rarr; Assigned Tasks Only
+                <strong>Developer</strong> (dev_rahul) &rarr; Assigned Tasks Only
             </button>
             <button type="button" class="quick-user-btn" onclick="fillUser('reports_sarah', 'password123')">
-                📊 <strong>Reports Admin</strong> (reports_sarah) &rarr; Analytics & BI Dashboard
+                <strong>Reports Admin</strong> (reports_sarah) &rarr; Analytics & BI Dashboard
             </button>
         </div>
     </div>

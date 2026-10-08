@@ -13,7 +13,7 @@ require_once __DIR__ . '/header.php';
 
 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
     <div>
-        <h2 style="font-size:20px; font-weight:700;">⚡ Executive Business Intelligence Dashboard</h2>
+        <h2 style="font-size:20px; font-weight:700;">Executive Business Intelligence Dashboard</h2>
         <p style="color:var(--text-muted); font-size:14px;">Real-time aggregation of transactional data across Clients, Revenue, Tasks, SLA records, and Developer Productivity.</p>
     </div>
     <div style="display:flex; gap:10px;">
@@ -57,13 +57,13 @@ require_once __DIR__ . '/header.php';
 <div class="card">
     <div style="display:flex; border-bottom:2px solid #e2e8f0; margin-bottom:20px;">
         <button id="tabBtn1" class="btn btn-outline" style="border:none; border-bottom:3px solid #2563eb; border-radius:0; font-weight:700; color:#2563eb;" onclick="switchTab(1)">
-            📊 Developer Productivity Leaderboard
+            Developer Productivity Leaderboard
         </button>
         <button id="tabBtn2" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(2)">
-            💼 Client & Billed Revenue BI
+            Client & Billed Revenue BI
         </button>
         <button id="tabBtn3" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(3)">
-            🛠️ Task Status & SLA Analytics
+            Task Status & SLA Analytics
         </button>
     </div>
 
@@ -146,7 +146,7 @@ require_once __DIR__ . '/header.php';
 <div id="drilldownModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:900px;">
         <div class="modal-header">
-            <h3 class="modal-title" id="dd_title">🔍 Executive Drill-Down Analysis</h3>
+            <h3 class="modal-title" id="dd_title">Executive Drill-Down Analysis</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('drilldownModal')">&times;</button>
         </div>
         <div class="modal-body">
@@ -290,7 +290,7 @@ require_once __DIR__ . '/header.php';
             .then(res => res.json())
             .then(data => {
                 if (!data.success) return;
-                document.getElementById('dd_title').textContent = `🔍 Drill-Down: ${data.type}`;
+                document.getElementById('dd_title').textContent = `Drill-Down: ${data.type}`;
                 const head = document.getElementById('dd_table_head');
                 const body = document.getElementById('dd_table_body');
 

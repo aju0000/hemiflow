@@ -156,8 +156,8 @@ require_once __DIR__ . '/header.php';
                 <div class="form-group">
                     <label class="form-label">Client Approval Decision *</label>
                     <select id="ca_status" class="form-select" required>
-                        <option value="Approved">✅ Client Approved (Mark Task Completed)</option>
-                        <option value="Revision Requested">❌ Client Requested Revision (Send Back to Developer)</option>
+                        <option value="Approved">Client Approved (Mark Task Completed)</option>
+                        <option value="Revision Requested">Client Requested Revision (Send Back to Developer)</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -248,7 +248,7 @@ require_once __DIR__ . '/header.php';
                         <span style="font-size:11px; color:#64748b;">${c.created_at}</span>
                     </div>
                     <p style="font-size:13px; color:#334155; margin:0; line-height:1.5; white-space:pre-wrap;">${c.comment_text}</p>
-                    ${c.attachment_url ? `<p style="margin-top:6px; font-size:12px;"><a href="${c.attachment_url}" target="_blank" style="color:#2563eb; font-weight:600;">📎 Attachment Deliverable Link</a></p>` : ''}
+                    ${c.attachment_url ? `<p style="margin-top:6px; font-size:12px;"><a href="${c.attachment_url}" target="_blank" style="color:#2563eb; font-weight:600;">Attachment Deliverable Link</a></p>` : ''}
                 </div>
             `;
         });
@@ -339,7 +339,7 @@ require_once __DIR__ . '/header.php';
         .then(data => {
             if (data.success) {
                 closeModal('clientApprovalModal');
-                alert('✅ ' + data.message);
+                alert(data.message);
                 loadTaskDetails();
             }
         });

@@ -33,6 +33,46 @@ function calculateTaskSLAStatus($task) {
     }
 }
 
+/**
+ * Helper to ensure document_types table exists and is seeded with defaults
+ */
+function ensureDocumentTypesTable($db) {
+    try {
+        $db->exec("CREATE TABLE IF NOT EXISTS document_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            description TEXT,
+            icon_name VARCHAR(50) DEFAULT 'file-text',
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $count = $db->query("SELECT COUNT(*) FROM document_types")->fetchColumn();
+        if ($count == 0) {
+            $defaults = [
+                ['Proposal', 'Sales proposal and project pitch document', 'file-text'],
+                ['Invoice', 'Tax & billing invoice document', 'credit-card'],
+                ['Quotation', 'Price estimate and quotation', 'dollar-sign'],
+                ['Contract', 'Binding commercial agreement', 'file-check'],
+                ['Service Agreement', 'Service level and agreement document', 'shield'],
+                ['MOM', 'Minutes of Meeting notes', 'clipboard'],
+                ['Payment Reminder', 'Outstanding invoice payment reminder', 'bell'],
+                ['Renewal Letter', 'Subscription / contract renewal letter', 'refresh-cw']
+            ];
+            $stmt = $db->prepare("INSERT INTO document_types (name, description, icon_name) VALUES (?, ?, ?)");
+            foreach ($defaults as $d) {
+                try {
+                    $stmt->execute($d);
+                } catch (Exception $e) {
+                    // Ignore duplicates
+                }
+            }
+        }
+    } catch (Exception $ex) {
+        // Silently handle DB table creation
+    }
+}
+
 try {
     switch ($action) {
 
@@ -291,12 +331,42 @@ try {
             echo json_encode(['success' => true, 'client_id' => $clientId, 'client_user' => $clientUser, 'message' => $msg]);
             break;
 
+        case 'update_client':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            if (!($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1 || hasModuleAccess('client-management') || hasModuleAccess('sales'))) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to update client details.']);
+                exit;
+            }
+
+            $clientId = intval($input['client_id'] ?? $input['id'] ?? 0);
+            $companyName = trim($input['company_name'] ?? '');
+            $contactPerson = trim($input['contact_person'] ?? '');
+            $email = trim($input['email'] ?? '');
+            $phone = trim($input['phone'] ?? '');
+            $taxId = trim($input['tax_id'] ?? '');
+            $status = $input['status'] ?? 'Approved / Active';
+            $notes = trim($input['notes'] ?? '');
+
+            if (!$clientId || empty($companyName) || empty($contactPerson) || empty($email)) {
+                echo json_encode(['success' => false, 'message' => 'Client ID, Company Name, Contact Person, and Email are required.']);
+                exit;
+            }
+
+            $stmtUpd = $db->prepare("UPDATE clients SET company_name = ?, contact_person = ?, email = ?, phone = ?, tax_id = ?, status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUpd->execute([$companyName, $contactPerson, $email, $phone, $taxId, $status, $notes, $clientId]);
+
+            logActivity($currentUser['id'], 'client-management', 'UPDATE_CLIENT', 'clients', $clientId, "Updated client details for {$companyName}");
+
+            echo json_encode(['success' => true, 'message' => "Client '{$companyName}' updated successfully."]);
+            break;
+
         case 'reset_client_password':
             checkAuth();
             $currentUser = getCurrentUser();
 
-            if (!($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1)) {
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can change or reset client portal passwords.']);
+            if (!($currentUser['role'] === 'Super Admin' || ($currentUser['role_id'] ?? 0) == 1 || hasModuleAccess('client-management') || hasModuleAccess('sales'))) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to reset client portal passwords.']);
                 exit;
             }
 
@@ -432,9 +502,214 @@ try {
         case 'get_client_services':
             checkAuth();
             $clientId = intval($_GET['client_id'] ?? 0);
-            $stmt = $db->prepare("SELECT * FROM client_services WHERE client_id = ? ORDER BY id DESC");
-            $stmt->execute([$clientId]);
+            if ($clientId > 0) {
+                $stmt = $db->prepare("SELECT cs.*, c.company_name FROM client_services cs JOIN clients c ON cs.client_id = c.id WHERE cs.client_id = ? ORDER BY cs.id DESC");
+                $stmt->execute([$clientId]);
+            } else {
+                $stmt = $db->prepare("SELECT cs.*, c.company_name FROM client_services cs JOIN clients c ON cs.client_id = c.id ORDER BY cs.id DESC");
+                $stmt->execute();
+            }
             echo json_encode(['success' => true, 'services' => $stmt->fetchAll()]);
+            break;
+
+        case 'add_service_package':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $clientId = intval($input['client_id'] ?? 0);
+            $serviceName = trim($input['service_name'] ?? '');
+            $packageName = trim($input['package_name'] ?? 'Standard Package');
+            $price = floatval($input['price'] ?? 0);
+            $currency = trim($input['currency'] ?? 'INR');
+            $billingTerms = trim($input['billing_terms'] ?? 'Monthly in advance');
+            $paymentTerms = trim($input['payment_terms'] ?? 'Net 15 days');
+            $status = trim($input['status'] ?? 'Active');
+
+            if ($clientId <= 0 || empty($serviceName)) {
+                echo json_encode(['success' => false, 'message' => 'Client ID and Service Name are required.']);
+                exit;
+            }
+
+            $stmtChk = $db->prepare("SELECT company_name FROM clients WHERE id = ?");
+            $stmtChk->execute([$clientId]);
+            $clientComp = $stmtChk->fetchColumn();
+            if (!$clientComp) {
+                echo json_encode(['success' => false, 'message' => 'Selected client does not exist.']);
+                exit;
+            }
+
+            $stmtIns = $db->prepare("INSERT INTO client_services (client_id, service_name, package_name, price, currency, billing_terms, payment_terms, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmtIns->execute([$clientId, $serviceName, $packageName, $price, $currency, $billingTerms, $paymentTerms, $status]);
+            $newId = $db->lastInsertId();
+
+            logActivity($currentUser['id'], 'sales', 'ADD_SERVICE_PACKAGE', 'client_services', $newId, "Added service package '{$packageName}' ({$serviceName}) for client {$clientComp}");
+
+            echo json_encode([
+                'success' => true,
+                'service_id' => $newId,
+                'message' => "Service package '{$packageName}' added successfully for {$clientComp}."
+            ]);
+            break;
+
+        case 'update_service_package':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $id = intval($input['id'] ?? $input['service_id'] ?? 0);
+            $clientId = intval($input['client_id'] ?? 0);
+            $serviceName = trim($input['service_name'] ?? '');
+            $packageName = trim($input['package_name'] ?? 'Standard Package');
+            $price = floatval($input['price'] ?? 0);
+            $currency = trim($input['currency'] ?? 'INR');
+            $billingTerms = trim($input['billing_terms'] ?? 'Monthly in advance');
+            $paymentTerms = trim($input['payment_terms'] ?? 'Net 15 days');
+            $status = trim($input['status'] ?? 'Active');
+
+            if ($id <= 0 || empty($serviceName)) {
+                echo json_encode(['success' => false, 'message' => 'Valid Service Package ID and Service Name are required.']);
+                exit;
+            }
+
+            $stmtUpd = $db->prepare("UPDATE client_services SET client_id = ?, service_name = ?, package_name = ?, price = ?, currency = ?, billing_terms = ?, payment_terms = ?, status = ? WHERE id = ?");
+            $stmtUpd->execute([$clientId, $serviceName, $packageName, $price, $currency, $billingTerms, $paymentTerms, $status, $id]);
+
+            logActivity($currentUser['id'], 'sales', 'UPDATE_SERVICE_PACKAGE', 'client_services', $id, "Updated service package '{$packageName}'");
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Service package '{$packageName}' updated successfully."
+            ]);
+            break;
+
+        case 'delete_service_package':
+            checkAuth();
+            $currentUser = getCurrentUser();
+            $id = intval($input['id'] ?? $input['service_id'] ?? 0);
+
+            if ($id <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid service package ID.']);
+                exit;
+            }
+
+            $db->prepare("DELETE FROM client_services WHERE id = ?")->execute([$id]);
+
+            logActivity($currentUser['id'], 'sales', 'DELETE_SERVICE_PACKAGE', 'client_services', $id, "Deleted service package #{$id}");
+
+            echo json_encode(['success' => true, 'message' => 'Service package deleted successfully.']);
+            break;
+
+        // --- DOCUMENT TYPES API ---
+        case 'get_document_types':
+            checkAuth();
+            ensureDocumentTypesTable($db);
+            $stmt = $db->query("SELECT dt.*, (SELECT COUNT(*) FROM document_templates t WHERE t.document_type = dt.name) as template_count, (SELECT COUNT(*) FROM documents d WHERE d.document_type = dt.name) as document_count FROM document_types dt WHERE dt.is_active = 1 ORDER BY dt.name ASC");
+            echo json_encode(['success' => true, 'document_types' => $stmt->fetchAll()]);
+            break;
+
+        case 'add_document_type':
+            checkAuth();
+            ensureDocumentTypesTable($db);
+            $currentUser = getCurrentUser();
+            $name = trim($input['name'] ?? '');
+            $description = trim($input['description'] ?? '');
+
+            if (empty($name)) {
+                echo json_encode(['success' => false, 'message' => 'Document type name is required.']);
+                exit;
+            }
+
+            $stmtChk = $db->prepare("SELECT id FROM document_types WHERE LOWER(name) = LOWER(?)");
+            $stmtChk->execute([$name]);
+            if ($stmtChk->fetch()) {
+                echo json_encode(['success' => false, 'message' => "Document type '{$name}' already exists."]);
+                exit;
+            }
+
+            $stmtIns = $db->prepare("INSERT INTO document_types (name, description, is_active) VALUES (?, ?, 1)");
+            $stmtIns->execute([$name, $description]);
+            $newId = $db->lastInsertId();
+
+            logActivity($currentUser['id'], 'template-generator', 'ADD_DOCUMENT_TYPE', 'document_types', $newId, "Added document type '{$name}'");
+
+            echo json_encode([
+                'success' => true,
+                'id' => $newId,
+                'name' => $name,
+                'message' => "Document type '{$name}' created successfully."
+            ]);
+            break;
+
+        case 'update_document_type':
+            checkAuth();
+            ensureDocumentTypesTable($db);
+            $currentUser = getCurrentUser();
+            $id = intval($input['id'] ?? 0);
+            $newName = trim($input['name'] ?? '');
+            $description = trim($input['description'] ?? '');
+
+            if ($id <= 0 || empty($newName)) {
+                echo json_encode(['success' => false, 'message' => 'Document type ID and valid Name are required.']);
+                exit;
+            }
+
+            $stmtOld = $db->prepare("SELECT name FROM document_types WHERE id = ?");
+            $stmtOld->execute([$id]);
+            $oldName = $stmtOld->fetchColumn();
+
+            if (!$oldName) {
+                echo json_encode(['success' => false, 'message' => 'Document type not found.']);
+                exit;
+            }
+
+            $stmtChk = $db->prepare("SELECT id FROM document_types WHERE LOWER(name) = LOWER(?) AND id != ?");
+            $stmtChk->execute([$newName, $id]);
+            if ($stmtChk->fetch()) {
+                echo json_encode(['success' => false, 'message' => "Another document type named '{$newName}' already exists."]);
+                exit;
+            }
+
+            $stmtUpd = $db->prepare("UPDATE document_types SET name = ?, description = ? WHERE id = ?");
+            $stmtUpd->execute([$newName, $description, $id]);
+
+            if ($oldName !== $newName) {
+                $db->prepare("UPDATE document_templates SET document_type = ? WHERE document_type = ?")->execute([$newName, $oldName]);
+                $db->prepare("UPDATE documents SET document_type = ? WHERE document_type = ?")->execute([$newName, $oldName]);
+            }
+
+            logActivity($currentUser['id'], 'template-generator', 'UPDATE_DOCUMENT_TYPE', 'document_types', $id, "Updated document type from '{$oldName}' to '{$newName}'");
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Document type '{$newName}' updated successfully."
+            ]);
+            break;
+
+        case 'delete_document_type':
+            checkAuth();
+            ensureDocumentTypesTable($db);
+            $currentUser = getCurrentUser();
+            $id = intval($input['id'] ?? 0);
+
+            if ($id <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid document type ID.']);
+                exit;
+            }
+
+            $stmtGet = $db->prepare("SELECT name FROM document_types WHERE id = ?");
+            $stmtGet->execute([$id]);
+            $typeName = $stmtGet->fetchColumn();
+
+            if ($typeName) {
+                $tmplCount = $db->prepare("SELECT COUNT(*) FROM document_templates WHERE document_type = ?");
+                $tmplCount->execute([$typeName]);
+                if ($tmplCount->fetchColumn() > 0) {
+                    $db->prepare("UPDATE document_types SET is_active = 0 WHERE id = ?")->execute([$id]);
+                } else {
+                    $db->prepare("DELETE FROM document_types WHERE id = ?")->execute([$id]);
+                }
+            }
+
+            logActivity($currentUser['id'], 'template-generator', 'DELETE_DOCUMENT_TYPE', 'document_types', $id, "Deleted document type #{$id}");
+
+            echo json_encode(['success' => true, 'message' => 'Document type deleted successfully.']);
             break;
 
         // --- TEMPLATES API ---

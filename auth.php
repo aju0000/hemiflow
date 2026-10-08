@@ -40,17 +40,18 @@ function loginUser($username, $password, $requiredModule = null) {
 
     // Super Admin has access to all modules
     if ($user['role_name'] === 'Super Admin') {
-        $allowedModules = ['sales', 'client-management', 'template-generator', 'task-management', 'reports'];
+        $allowedModules = ['sales', 'client-management', 'template-generator', 'task-management', 'reports', 'user-management'];
     }
 
     // Backend Module Permission Enforcement
-    if ($requiredModule && !in_array($requiredModule, $allowedModules)) {
+    if ($requiredModule && !in_array($requiredModule, $allowedModules) && $user['role_name'] !== 'Super Admin') {
         return [
             'success' => false,
             'message' => "Access Denied: Your role ({$user['role_name']}) does not have permission to access the " . strtoupper($requiredModule) . " module."
         ];
     }
 
+    
     // Set Session
     $_SESSION['user'] = [
         'id' => $user['id'],
@@ -77,6 +78,30 @@ function loginUser($username, $password, $requiredModule = null) {
  */
 function getCurrentUser() {
     return isset($_SESSION['user']) ? $_SESSION['user'] : null;
+}
+
+/**
+ * Check if current user has access to a specific module code
+ */
+function hasModuleAccess($moduleCode) {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    
+    // Super Admin has unrestricted access to all modules
+    if (isset($user['role']) && $user['role'] === 'Super Admin') {
+        return true;
+    }
+
+    // Admin / User Management restriction
+    if ($moduleCode === 'user-management' || $moduleCode === 'users') {
+        return isset($user['role']) && in_array($user['role'], ['Super Admin', 'Admin']);
+    }
+
+    if (!isset($user['allowed_modules']) || !is_array($user['allowed_modules'])) {
+        return false;
+    }
+
+    return in_array($moduleCode, $user['allowed_modules']);
 }
 
 /**
@@ -168,7 +193,7 @@ function checkAuth($requiredModule = null) {
         }
     }
 
-    if ($requiredModule && $requiredModule !== 'client_dashboard' && !in_array($requiredModule, $user['allowed_modules']) && $user['role'] !== 'Super Admin') {
+    if ($requiredModule && $requiredModule !== 'client_dashboard' && !hasModuleAccess($requiredModule)) {
         if (isApiRequest()) {
             header('Content-Type: application/json');
             http_response_code(403);
@@ -202,6 +227,9 @@ function checkAuth($requiredModule = null) {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>403 Access Denied — HemiFlow</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Google+Sans+Text:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&display=swap" rel="stylesheet">
                 <link rel="stylesheet" href="styles.css">
                 <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
                 <style>
@@ -213,7 +241,7 @@ function checkAuth($requiredModule = null) {
                         justify-content: center;
                         min-height: 100vh;
                         margin: 0;
-                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                        font-family: "Google Sans", "Google Sans Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                         padding: 20px;
                     }
                     .access-denied-card {
