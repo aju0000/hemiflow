@@ -42,17 +42,30 @@ require_once __DIR__ . '/header.php';
                 <p id="t_description" style="font-size:14px; color:#475569; line-height:1.6; white-space:pre-wrap;">Loading...</p>
             </div>
 
-            <!-- Task Actions Bar -->
-            <div style="display:flex; gap:10px; padding-top:15px; border-top:1px solid var(--border);">
-                <button id="btnSubmitWork" class="btn btn-success" style="display:none;" onclick="openSubmitModal()">
-                    <i data-feather="send"></i> Submit Work for Review
-                </button>
-                <button id="btnReviewWork" class="btn btn-primary" style="display:none;" onclick="openReviewModal()">
-                    <i data-feather="check-square"></i> Team Lead Review Work
-                </button>
-                <button id="btnClientApprove" class="btn btn-warning" style="display:none;" onclick="openClientApprovalModal()">
-                    <i data-feather="user-check"></i> Process Client Approval
-                </button>
+            <!-- Task Actions & Quick Status Management Bar -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:15px; border-top:1px solid var(--border);">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <label style="font-size:13px; font-weight:700; color:#0f172a;">Change Status:</label>
+                    <select id="quickStatusSelect" class="form-select" onchange="updateTaskStatusFromDetails(this.value)" style="font-weight:700; max-width:210px;">
+                        <option value="PENDING">⏳ PENDING</option>
+                        <option value="IN PROGRESS">⚡ IN PROGRESS</option>
+                        <option value="UNDER REVIEW">🔍 UNDER REVIEW</option>
+                        <option value="REVISION REQUIRED">🔄 REVISION REQUIRED</option>
+                        <option value="COMPLETED">✅ COMPLETED</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="btnMarkInProgress" class="btn btn-outline btn-sm" onclick="updateTaskStatusFromDetails('IN PROGRESS')" style="color:#0284c7; border-color:#93c5fd;">
+                        ⚡ In Progress
+                    </button>
+                    <button id="btnMarkCompleted" class="btn btn-success btn-sm" onclick="updateTaskStatusFromDetails('COMPLETED')">
+                        ✅ Mark Completed
+                    </button>
+                    <button id="btnSubmitWork" class="btn btn-outline btn-sm" style="display:none;" onclick="openSubmitModal()">
+                        <i data-feather="send"></i> Submit Work Notes
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -124,10 +137,6 @@ require_once __DIR__ . '/header.php';
                 <div style="display:flex; justify-content:space-between;">
                     <span style="color:var(--text-muted);">SLA Due Date:</span>
                     <strong id="m_sla_due">Loading...</strong>
-                </div>
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:var(--text-muted);">Client Approval Req:</span>
-                    <strong id="m_client_req">No</strong>
                 </div>
             </div>
         </div>
@@ -205,6 +214,10 @@ require_once __DIR__ . '/header.php';
                 document.getElementById('t_sla_badge').textContent = t.sla_status;
                 document.getElementById('t_sla_badge').className = `badge ${t.sla_status === 'SLA Breached' ? 'badge-danger' : (t.sla_status === 'Near SLA Warning' ? 'badge-warning' : 'badge-primary')}`;
 
+                // Sync Quick Status Selector
+                const statusSel = document.getElementById('quickStatusSelect');
+                if (statusSel) statusSel.value = t.status;
+
                 // Metadata
                 document.getElementById('m_assigned_to').textContent = t.assigned_to_name || 'Unassigned';
                 document.getElementById('m_team_lead').textContent = t.team_lead_name || 'Ajmal Team Lead';
@@ -212,17 +225,10 @@ require_once __DIR__ . '/header.php';
                 document.getElementById('m_priority').textContent = t.priority;
                 document.getElementById('m_sla_hours').textContent = `${t.sla_hours} Hours`;
                 document.getElementById('m_sla_due').textContent = t.sla_due_time ? t.sla_due_time.substring(0, 16) : 'N/A';
-                document.getElementById('m_client_req').textContent = t.client_approval_required ? 'Yes' : 'No';
 
                 // Render Buttons
                 if (userRole === 'Developer' && t.assigned_to == userId && t.status !== 'COMPLETED' && t.status !== 'UNDER REVIEW') {
-                    document.getElementById('btnSubmitWork').style.display = 'inline-flex';
-                }
-                if (userRole !== 'Developer' && t.status === 'UNDER REVIEW') {
-                    document.getElementById('btnReviewWork').style.display = 'inline-flex';
-                }
-                if (userRole !== 'Developer' && t.status === 'SENT FOR CLIENT APPROVAL') {
-                    document.getElementById('btnClientApprove').style.display = 'inline-flex';
+                    if (document.getElementById('btnSubmitWork')) document.getElementById('btnSubmitWork').style.display = 'inline-flex';
                 }
 
                 // Render Comments
@@ -318,22 +324,12 @@ require_once __DIR__ . '/header.php';
         });
     }
 
-    function openSubmitModal() { window.location.href = `projects.php`; }
-    function openReviewModal() { window.location.href = `projects.php`; }
-    function openClientApprovalModal() { document.getElementById('clientApprovalModal').style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-    function submitClientApproval() {
-        const payload = {
-            task_id: taskId,
-            approval_status: document.getElementById('ca_status').value,
-            client_feedback: document.getElementById('ca_feedback').value
-        };
-
-        fetch('api.php?action=process_client_approval', {
+    function updateTaskStatusFromDetails(newStatus) {
+        if (!newStatus) return;
+        fetch('api.php?action=update_task_status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ task_id: taskId, status: newStatus })
         })
         .then(res => res.json())
         .then(data => {
@@ -341,9 +337,18 @@ require_once __DIR__ . '/header.php';
                 closeModal('clientApprovalModal');
                 alert(data.message);
                 loadTaskDetails();
+            } else {
+                alert('Error: ' + data.message);
             }
+        })
+        .catch(err => {
+            alert('Failed to update task status.');
         });
     }
+
+    function openSubmitModal() { window.location.href = `projects.php`; }
+    function openReviewModal() { window.location.href = `projects.php`; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 </script>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

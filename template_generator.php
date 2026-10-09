@@ -1389,8 +1389,32 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
 
     function openQuickClientModal() { document.getElementById('quickClientModal').style.display = 'flex'; }
     function openHandoverModal() {
-        if (!currentSavedDocId) { alert('Please save the document first.'); return; }
+        if (!currentSavedDocId) { 
+            alert('Please generate and save the document first before submitting handover.'); 
+            return; 
+        }
         
+        // Dynamically load active Team Leads & Admins into select dropdown
+        fetch('api.php?action=get_users')
+            .then(res => res.json())
+            .then(data => {
+                const leadSelect = document.getElementById('ho_team_lead');
+                if (leadSelect && data.success && data.users) {
+                    let html = '';
+                    const leads = data.users.filter(u => parseInt(u.role_id) === 4 || parseInt(u.role_id) === 1);
+                    if (leads.length > 0) {
+                        leads.forEach(l => {
+                            html += `<option value="${l.id}">${escapeHtml(l.full_name)} (${escapeHtml(l.role_name)})</option>`;
+                        });
+                    } else {
+                        data.users.forEach(l => {
+                            html += `<option value="${l.id}">${escapeHtml(l.full_name)} (${escapeHtml(l.role_name)})</option>`;
+                        });
+                    }
+                    leadSelect.innerHTML = html;
+                }
+            });
+
         fetch(`api.php?action=get_document_details&id=${currentSavedDocId}`)
             .then(res => res.json())
             .then(data => {
@@ -1402,7 +1426,7 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
                 }
             });
 
-        document.getElementById('ho_project_name').value = document.getElementById('previewDocTitle').textContent;
+        document.getElementById('ho_project_name').value = document.getElementById('previewDocTitle').textContent || 'New Project Handover';
         document.getElementById('handoverModal').style.display = 'flex';
     }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -1439,14 +1463,34 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
     }
 
     function submitHandover() {
+        if (!currentSavedDocId) {
+            alert('Error: No active saved document found for handover. Please save the document first.');
+            return;
+        }
+
+        const teamLeadElem = document.getElementById('ho_team_lead');
+        const teamLeadId = teamLeadElem ? teamLeadElem.value : 0;
+        const projectName = document.getElementById('ho_project_name').value.trim();
+
+        if (!projectName) {
+            alert('Please enter a valid Project / Work Title.');
+            return;
+        }
+
         const payload = {
             document_id: currentSavedDocId,
-            project_name: document.getElementById('ho_project_name').value,
-            team_lead_id: document.getElementById('ho_team_lead').value,
+            project_name: projectName,
+            team_lead_id: teamLeadId,
             priority: document.getElementById('ho_priority').value,
             deadline: document.getElementById('ho_deadline').value,
             description: document.getElementById('ho_description').value
         };
+
+        const submitBtn = document.querySelector('#handoverModal button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing Handover...';
+        }
 
         fetch('api.php?action=handover_to_project', {
             method: 'POST',
@@ -1455,11 +1499,24 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         })
         .then(res => res.json())
         .then(data => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Approve & Handover Work';
+            }
             if (data.success) {
                 closeModal('handoverModal');
                 alert(data.message);
                 window.location.href = 'projects.php';
+            } else {
+                alert('Handover Error: ' + (data.message || 'Failed to process handover.'));
             }
+        })
+        .catch(err => {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Approve & Handover Work';
+            }
+            alert('Network / Server Error: ' + err);
         });
     }
 

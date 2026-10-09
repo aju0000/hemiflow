@@ -10,8 +10,8 @@ $db = getDbConnection();
 $pageTitle = "Module 4 — Project & Task Management Hub";
 require_once __DIR__ . '/header.php';
 
-// Fetch developers for assignment
-$developers = $db->query("SELECT u.* FROM users u JOIN roles r ON u.role_id = r.id WHERE r.name = 'Developer' OR u.department = 'Development'")->fetchAll();
+// Fetch developers and staff for task assignment
+$developers = $db->query("SELECT u.*, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 ORDER BY u.full_name ASC")->fetchAll();
 
 // Fetch clients & active projects
 $clients = $db->query("SELECT * FROM clients ORDER BY company_name ASC")->fetchAll();
@@ -65,7 +65,6 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
                 <option value="IN PROGRESS">In Progress</option>
                 <option value="UNDER REVIEW">Under Review</option>
                 <option value="REVISION REQUIRED">Revision Required</option>
-                <option value="SENT FOR CLIENT APPROVAL">Sent for Client Approval</option>
                 <option value="COMPLETED">Completed</option>
             </select>
         </div>
@@ -212,24 +211,10 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
                     </div>
                 </div>
 
-                <div class="grid-2">
-                    <div class="form-group">
-                        <label class="form-label">SLA Hours *</label>
-                        <select id="ct_sla_hours" class="form-select" required>
-                            <option value="8">8 Hours (Express SLA)</option>
-                            <option value="24" selected>24 Hours (Standard SLA)</option>
-                            <option value="48">48 Hours (2 Days)</option>
-                            <option value="72">72 Hours (3 Days)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Client Approval Required?</label>
-                        <select id="ct_client_approval" class="form-select">
-                            <option value="0" selected>No (Internal Work Only)</option>
-                            <option value="1">Yes (Requires Client Approval)</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">SLA Hours (Manual Entry) *</label>
+                    <input type="number" id="ct_sla_hours" class="form-control" required min="1" max="1000" value="24" placeholder="Enter SLA hours (e.g. 12, 24, 36, 72)">
+                    <small style="color:var(--text-muted); font-size:11px;">(Enter custom SLA duration in hours)</small>
                 </div>
             </div>
             <div class="modal-footer">
@@ -315,6 +300,34 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
                 <button type="submit" class="btn btn-primary">Submit Review</button>
             </div>
         </form>
+<!-- MODAL 4: REASSIGN TASK (Team Lead / Admin Only) -->
+<div id="reassignTaskModal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="max-width:500px;">
+        <div class="modal-header">
+            <h3 class="modal-title">👤 Assign / Re-assign Task</h3>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('reassignTaskModal')">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); submitReassignTask();">
+            <div class="modal-body">
+                <input type="hidden" id="rt_task_id" value="0">
+                <p style="font-size:13px; color:#475569; margin-bottom:12px;">
+                    Assigning task: <strong id="rt_task_title"></strong>
+                </p>
+                <div class="form-group">
+                    <label class="form-label">Assign To Developer / User *</label>
+                    <select id="rt_assigned_to" class="form-select" required>
+                        <option value="">-- Select Developer / User --</option>
+                        <?php foreach ($developers as $d): ?>
+                            <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['full_name']) ?> (<?= htmlspecialchars($d['role_name'] ?? $d['department']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('reassignTaskModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Confirm Assignment</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -375,6 +388,37 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
             });
     }
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function updateTaskStatusDirect(taskId, newStatus) {
+        if (!taskId || !newStatus) return;
+        fetch('api.php?action=update_task_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, status: newStatus })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadMetrics();
+                loadTasks();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('Failed to update task status.');
+        });
+    }
+
     function renderDeveloperKanban(tasks) {
         const cols = {
             PENDING: { elem: document.getElementById('colPending'), cnt: document.getElementById('cntPending'), items: [] },
@@ -398,19 +442,23 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
             } else {
                 cols[key].items.forEach(t => {
                     const slaClass = t.sla_status === 'SLA Breached' ? 'badge-danger' : (t.sla_status === 'Near SLA Warning' ? 'badge-warning' : 'badge-primary');
+                    const safeTitle = (t.title || '').replace(/'/g, "\\'");
                     html += `
-                        <div style="background:white; border:1px solid #e2e8f0; border-radius:6px; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <strong style="font-size:12px; color:#2563eb;">${t.task_code}</strong>
                                 <span class="badge ${slaClass}" style="font-size:10px;">${t.sla_status}</span>
                             </div>
-                            <h5 style="margin:6px 0; font-size:14px;">${t.title}</h5>
-                            <p style="font-size:12px; color:#64748b; margin-bottom:10px;">Project: ${t.project_name}</p>
+                            <h5 style="margin:8px 0; font-size:14px; color:#0f172a; font-weight:600;">${escapeHtml(t.title)}</h5>
+                            <p style="font-size:12px; color:#64748b; margin-bottom:12px;">Project: ${escapeHtml(t.project_name)}</p>
 
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm" style="font-size:11px;">View Task</a>
-                                ${t.status === 'PENDING' || t.status === 'IN PROGRESS' || t.status === 'REVISION REQUIRED' ? `
-                                    <button class="btn btn-success btn-sm" style="font-size:11px;" onclick="openSubmitWorkModal(${t.id}, '${t.title.replace(/'/g, "\\'")}')">Submit Work</button>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+                                <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm" style="font-size:11px;">View Details</a>
+                                ${t.status === 'PENDING' ? `
+                                    <button class="btn btn-outline btn-sm" style="font-size:11px; color:#0284c7; border-color:#93c5fd;" onclick="updateTaskStatusDirect(${t.id}, 'IN PROGRESS')">⚡ Start</button>
+                                ` : ''}
+                                ${t.status === 'IN PROGRESS' || t.status === 'REVISION REQUIRED' ? `
+                                    <button class="btn btn-success btn-sm" style="font-size:11px;" onclick="openSubmitWorkModal(${t.id}, '${safeTitle}')">Submit Work</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -431,28 +479,39 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
         let html = '';
         tasks.forEach(t => {
             const slaClass = t.sla_status === 'SLA Breached' ? 'badge-danger' : (t.sla_status === 'Near SLA Warning' ? 'badge-warning' : 'badge-primary');
-            const statusClass = t.status === 'COMPLETED' ? 'badge-success' : (t.status === 'UNDER REVIEW' ? 'badge-warning' : (t.status === 'REVISION REQUIRED' ? 'badge-danger' : 'badge-primary'));
+            const safeTitle = escapeHtml(t.title);
 
             html += `
                 <tr>
-                    <td><strong>${t.task_code}</strong></td>
+                    <td><strong style="color:#2563eb;">${t.task_code}</strong></td>
                     <td>
-                        <a href="task_details.php?id=${t.id}" style="font-weight:700; color:var(--text); text-decoration:none;">${t.title}</a>
+                        <a href="task_details.php?id=${t.id}" style="font-weight:700; color:#0f172a; text-decoration:none;">${safeTitle}</a>
                     </td>
                     <td>
-                        ${t.project_name}<br>
-                        <small style="color:var(--text-muted);">${t.company_name}</small>
+                        <strong style="color:#334155;">${escapeHtml(t.project_name)}</strong><br>
+                        <small style="color:var(--text-muted);">${escapeHtml(t.company_name)}</small>
                     </td>
-                    <td><span class="badge badge-secondary">${t.assigned_to_name || 'Unassigned'}</span></td>
+                    <td><span class="badge badge-secondary">${escapeHtml(t.assigned_to_name || 'Unassigned')}</span></td>
                     <td><span class="badge ${t.priority === 'Urgent' ? 'badge-danger' : 'badge-warning'}">${t.priority}</span></td>
-                    <td><span class="badge ${statusClass}">${t.status}</span></td>
-                    <td><span class="badge ${slaClass}">${t.sla_status}</span></td>
-                    <td><small>${t.deadline ? t.deadline.substring(0, 16) : 'N/A'}</small></td>
                     <td>
-                        <div style="display:flex; gap:6px;">
-                            <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm">Details</a>
+                        <select class="form-select" style="font-size:12px; font-weight:700; padding:4px 8px; width:135px; border-radius:6px; cursor:pointer;" onchange="updateTaskStatusDirect(${t.id}, this.value)">
+                            <option value="PENDING" ${t.status === 'PENDING' ? 'selected' : ''}>⏳ Pending</option>
+                            <option value="IN PROGRESS" ${t.status === 'IN PROGRESS' ? 'selected' : ''}>⚡ In Progress</option>
+                            <option value="UNDER REVIEW" ${t.status === 'UNDER REVIEW' ? 'selected' : ''}>🔍 Under Review</option>
+                            <option value="REVISION REQUIRED" ${t.status === 'REVISION REQUIRED' ? 'selected' : ''}>🔄 Revision Needed</option>
+                            <option value="COMPLETED" ${t.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
+                        </select>
+                    </td>
+                    <td><span class="badge ${slaClass}">${t.sla_status}</span></td>
+                    <td><small style="color:#475569;">${t.deadline ? t.deadline.substring(0, 16) : 'N/A'}</small></td>
+                    <td>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm" title="View details & discussion">Details</a>
+                            <button class="btn btn-outline btn-sm" onclick="openReassignModal(${t.id}, '${safeTitle.replace(/'/g, "\\'")}', ${t.assigned_to || 0})" style="color:#2563eb; border-color:#93c5fd;" title="Assign or reassign task to developer">
+                                👤 Assign
+                            </button>
                             ${t.status === 'UNDER REVIEW' ? `
-                                <button class="btn btn-primary btn-sm" onclick="openReviewModal(${t.id}, '${t.task_code}', '${(t.remarks || '').replace(/'/g, "\\'")}')">Review Work</button>
+                                <button class="btn btn-primary btn-sm" onclick="openReviewModal(${t.id}, '${t.task_code}', '${(t.remarks || '').replace(/'/g, "\\'")}')">Review</button>
                             ` : ''}
                         </div>
                     </td>
@@ -460,6 +519,42 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
             `;
         });
         tbody.innerHTML = html;
+        if (window.feather) feather.replace();
+    }
+
+    function openReassignModal(taskId, title, currentAssignee) {
+        document.getElementById('rt_task_id').value = taskId;
+        document.getElementById('rt_task_title').textContent = title;
+        if (document.getElementById('rt_assigned_to')) {
+            document.getElementById('rt_assigned_to').value = currentAssignee || '';
+        }
+        document.getElementById('reassignTaskModal').style.display = 'flex';
+    }
+
+    function submitReassignTask() {
+        const taskId = document.getElementById('rt_task_id').value;
+        const assignedTo = document.getElementById('rt_assigned_to').value;
+
+        if (!taskId || !assignedTo) {
+            alert('Please select a target developer or user.');
+            return;
+        }
+
+        fetch('api.php?action=reassign_task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, assigned_to: assignedTo })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                closeModal('reassignTaskModal');
+                alert('✅ ' + data.message);
+                loadTasks();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
     }
 
     // Modal Helpers
@@ -489,8 +584,7 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
             description: document.getElementById('ct_description').value,
             assigned_to: document.getElementById('ct_assigned_to').value,
             priority: document.getElementById('ct_priority').value,
-            sla_hours: document.getElementById('ct_sla_hours').value,
-            client_approval_required: document.getElementById('ct_client_approval').value
+            sla_hours: document.getElementById('ct_sla_hours').value
         };
 
         fetch('api.php?action=create_task', {

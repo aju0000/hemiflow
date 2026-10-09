@@ -97,16 +97,32 @@ $currentScript = basename($_SERVER['PHP_SELF']);
 
     <!-- Main Wrapper -->
     <div class="main-wrapper">
-        <header class="top-header no-print">
+        <header class="top-header no-print" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h1 class="page-title"><?= isset($pageTitle) ? htmlspecialchars($pageTitle) : 'HemiFlow Portal' ?></h1>
             </div>
-            <div class="header-actions">
-                <span class="badge badge-primary">
-                    <i data-feather="shield" style="width:12px; height:12px;"></i>
-                    <?= htmlspecialchars($user['role'] ?? 'Guest') ?> Mode
-                </span>
-                <a href="login.php" class="btn btn-outline btn-sm">Switch Role / Module Login</a>
+            <div class="header-actions" style="display:flex; align-items:center; gap:12px;">
+                <!-- User Account Profile Badge -->
+                <div style="display:flex; align-items:center; gap:10px; background:#f8fafc; border:1px solid #cbd5e1; padding:6px 14px; border-radius:30px;">
+                    <div style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:#ffffff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;">
+                        <?= strtoupper(substr($user['full_name'] ?? ($user['username'] ?? 'U'), 0, 1)) ?>
+                    </div>
+                    <div style="display:flex; flex-direction:column; line-height:1.2;">
+                        <span style="font-size:13px; font-weight:700; color:#0f172a;"><?= htmlspecialchars($user['full_name'] ?? $user['username'] ?? 'User') ?></span>
+                        <span style="font-size:11px; color:#64748b; font-weight:600;"><?= htmlspecialchars($user['role'] ?? 'Guest') ?></span>
+                    </div>
+                </div>
+
+                <!-- Change Password Action Button -->
+                <button type="button" class="btn btn-outline btn-sm" onclick="openChangeMyPasswordModal()" style="display:flex; align-items:center; gap:6px; font-weight:600; border-color:#cbd5e1; color:#0f172a;">
+                    <i data-feather="key" style="width:14px; height:14px; color:#2563eb;"></i>
+                    <span>Change Password</span>
+                </button>
+
+                <a href="login.php?action=logout" class="btn btn-outline-danger btn-sm" style="display:flex; align-items:center; gap:4px;" title="Logout">
+                    <i data-feather="log-out" style="width:14px; height:14px;"></i>
+                    <span>Logout</span>
+                </a>
             </div>
         </header>
 
