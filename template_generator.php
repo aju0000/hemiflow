@@ -7,7 +7,9 @@ checkAuth('template-generator');
 $user = getCurrentUser();
 $db = getDbConnection();
 
-$pageTitle = "Module 3 — Premium Template Generator & Customizer Suite";
+$pageBreadcrumb = "Module 3";
+$pageTitle = "Premium Template Generator & Customizer Suite";
+$pageSubtitle = "Create new documents, edit existing saved documents, build custom templates, and manage multi-page proposals.";
 require_once __DIR__ . '/header.php';
 
 // Fetch active clients
@@ -23,39 +25,49 @@ foreach ($templates as $t) {
 }
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; flex-wrap:wrap; gap:12px;">
-    <div>
-        <h2 style="font-size:20px; font-weight:700;">Document Generator & Customizer Suite</h2>
-        <p style="color:var(--text-muted); font-size:14px;">Create new documents, edit existing saved documents, build custom templates, and manage multi-page proposals.</p>
-    </div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="openNewDocumentModal()">
-            <i data-feather="plus-circle"></i> + Add New Document
-        </button>
-        <button class="btn btn-outline" onclick="openSavedDocumentsModal()">
-            <i data-feather="folder"></i> Saved Documents & Edit
-        </button>
-        <button class="btn btn-outline" onclick="openTemplateEditorModal()">
-            <i data-feather="edit-3"></i> Edit / Add Template
-        </button>
-        <button class="btn btn-outline" onclick="openDocumentTypesModal()">
-            <i data-feather="tag"></i> Document Types
-        </button>
-        <button class="btn btn-outline" onclick="openQuickClientModal()">
-            <i data-feather="user-plus"></i> + Add Client
-        </button>
-        <button class="btn btn-outline" onclick="openVersionHistoryModal()">
-            <i data-feather="clock"></i> Version History
-        </button>
-    </div>
+<!-- Action Pills Navigation Bar (Exact from Screenshot) -->
+<div class="action-pills-row">
+    <button class="btn-pill-primary" onclick="openNewDocumentModal()">
+        <i data-feather="plus" class="icon-prefix"></i>
+        <span>+ Add New Document</span>
+        <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+    </button>
+    <button class="btn-pill-white" onclick="openSavedDocumentsModal()">
+        <i data-feather="folder" class="icon-folder"></i>
+        <span>Saved Documents & Edit</span>
+    </button>
+    <button class="btn-pill-white" onclick="openTemplateEditorModal()">
+        <i data-feather="edit-3" class="icon-edit"></i>
+        <span>Edit / Add Template</span>
+    </button>
+    <button class="btn-pill-white" onclick="openDocumentTypesModal()">
+        <i data-feather="tag" class="icon-tag"></i>
+        <span>Document Types</span>
+    </button>
+    <button class="btn-pill-white" onclick="openQuickClientModal()">
+        <i data-feather="user-plus" class="icon-user"></i>
+        <span>+ Add Client</span>
+    </button>
+    <button class="btn-pill-white" onclick="openVersionHistoryModal()">
+        <i data-feather="clock" class="icon-clock"></i>
+        <span>Version History</span>
+    </button>
 </div>
 
-<div class="grid-2" style="grid-template-columns: 380px 1fr; align-items: start;">
+<div class="grid-2" style="grid-template-columns: 390px 1fr; align-items: start; gap: 24px;">
 
     <!-- Left Column: Generator Configuration & Custom Fields -->
-    <div class="card">
-        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <h3 class="card-title"><i data-feather="sliders" style="width:16px; height:16px;"></i> Document Configuration</h3>
+    <div class="card" style="padding: 24px;">
+        <div class="card-header-clean">
+            <div class="card-title-group">
+                <div class="card-icon-box">
+                    <i data-feather="sliders"></i>
+                </div>
+                <div class="card-title-text">
+                    <h3>Document Configuration</h3>
+                    <p>Set up your document details and generate with ease.</p>
+                </div>
+            </div>
             <span id="editingDocBadge" class="badge badge-info" style="display:none;">Editing Mode</span>
         </div>
 
@@ -63,17 +75,26 @@ foreach ($templates as $t) {
             <input type="hidden" id="activeDocumentId" value="0">
 
             <!-- Mode Selector / Saved Document Selector -->
-            <div class="form-group" style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:10px;">
-                <label class="form-label" style="color:#0369a1; font-weight:700;">Mode / Load Saved Document</label>
-                <select id="savedDocQuickSelect" class="form-select" onchange="onQuickSavedDocSelected()">
-                    <option value="0">Mode: Create New Document from Template</option>
-                    <!-- Populated dynamically -->
-                </select>
+            <div class="mode-load-card">
+                <div class="mode-icon-box">
+                    <i data-feather="file-text"></i>
+                </div>
+                <div class="mode-content">
+                    <label class="mode-label">Mode / Load Saved Document</label>
+                    <select id="savedDocQuickSelect" class="form-select" onchange="onQuickSavedDocSelected()" style="background-color:#ffffff; font-size:13px; font-weight:600;">
+                        <option value="0">Create New Document from Template</option>
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
             </div>
 
             <!-- Step 1: Select Client -->
-            <div class="form-group">
-                <label class="form-label">1. Select Client *</label>
+            <div class="form-step-group">
+                <div class="step-label-row">
+                    <div class="step-num-badge">1</div>
+                    <i data-feather="user" class="step-icon-indicator"></i>
+                    <span class="step-label-title">Select Client *</span>
+                </div>
                 <select id="clientSelect" class="form-select" onchange="onClientChanged()" required>
                     <option value="">-- Choose Existing Client --</option>
                     <?php foreach ($clients as $c): ?>
@@ -90,16 +111,24 @@ foreach ($templates as $t) {
             </div>
 
             <!-- Step 2: Select Client Service Package -->
-            <div class="form-group">
-                <label class="form-label">2. Select Service Package *</label>
+            <div class="form-step-group">
+                <div class="step-label-row">
+                    <div class="step-num-badge">2</div>
+                    <i data-feather="package" class="step-icon-indicator"></i>
+                    <span class="step-label-title">Select Service Package *</span>
+                </div>
                 <select id="serviceSelect" class="form-select" onchange="onServiceChanged()" required>
                     <option value="">-- Select Client First --</option>
                 </select>
             </div>
 
             <!-- Step 3: Document Type & Template -->
-            <div class="form-group">
-                <label class="form-label">3. Document Type *</label>
+            <div class="form-step-group">
+                <div class="step-label-row">
+                    <div class="step-num-badge">3</div>
+                    <i data-feather="file-text" class="step-icon-indicator"></i>
+                    <span class="step-label-title">Document Type *</span>
+                </div>
                 <select id="docTypeSelect" class="form-select" onchange="onDocTypeChanged()" required>
                     <option value="">-- Select Document Type --</option>
                     <option value="Proposal">Business Proposal (Premium Multi-Page)</option>
@@ -113,42 +142,49 @@ foreach ($templates as $t) {
                 </select>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">4. Select Template *</label>
+            <div class="form-step-group">
+                <div class="step-label-row">
+                    <div class="step-num-badge">4</div>
+                    <i data-feather="layout" class="step-icon-indicator"></i>
+                    <span class="step-label-title">Select Template *</span>
+                </div>
                 <select id="templateSelect" class="form-select" onchange="previewDocument()" required>
                     <option value="">-- Select Template --</option>
                 </select>
             </div>
 
             <!-- Auto-filled Metadata Summary -->
-            <div id="autofillSummary" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:18px; font-size:12px; display:none;">
+            <div id="autofillSummary" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:18px; font-size:12px; display:none;">
                 <p style="font-weight:700; color:#334155; margin-bottom:4px;">Auto-Loaded Metadata:</p>
                 <div id="autofillDetails" style="color:#64748b; line-height:1.5;"></div>
             </div>
 
             <!-- Custom Template Variable Input Fields -->
-            <div class="card-header" style="margin-top:10px; padding-bottom:8px;">
-                <h4 style="font-size:14px; font-weight:700;">Custom Fields & Scope Settings</h4>
-            </div>
+            <div style="border-top: 1px solid var(--border-subtle); margin-top:16px; padding-top:14px; margin-bottom:14px;">
+                <h4 style="font-size:13.5px; font-weight:700; color:var(--secondary); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                    <i data-feather="edit-2" style="width:14px; height:14px; color:var(--primary);"></i>
+                    <span>Custom Fields & Scope Settings</span>
+                </h4>
 
-            <div class="form-group">
-                <label class="form-label">Agency Name</label>
-                <input type="text" id="agencyName" class="form-control" value="Hemito Digital Pvt Ltd" onchange="previewDocument()">
-            </div>
+                <div class="form-group">
+                    <label class="form-label">Agency Name</label>
+                    <input type="text" id="agencyName" class="form-control" value="Hemito Digital Pvt Ltd" onchange="previewDocument()">
+                </div>
 
-            <div class="form-group">
-                <label class="form-label">Agency Address & Phone</label>
-                <input type="text" id="agencyAddress" class="form-control" value="2nd Floor, ACEL Tower, Kadavanthra, Kochi | +91-8921992187" onchange="previewDocument()">
-            </div>
+                <div class="form-group">
+                    <label class="form-label">Agency Address & Phone</label>
+                    <input type="text" id="agencyAddress" class="form-control" value="2nd Floor, ACEL Tower, Kadavanthra, Kochi | +91-8921992187" onchange="previewDocument()">
+                </div>
 
-            <div class="form-group">
-                <label class="form-label">Scope of Work / Deliverables</label>
-                <textarea id="customScope" class="form-control" placeholder="Enter custom technical scope or key milestones..." onchange="previewDocument()"></textarea>
-            </div>
+                <div class="form-group">
+                    <label class="form-label">Scope of Work / Deliverables</label>
+                    <textarea id="customScope" class="form-control" placeholder="Enter custom technical scope or key milestones..." onchange="previewDocument()"></textarea>
+                </div>
 
-            <div class="form-group">
-                <label class="form-label">Meeting Notes / Custom Terms</label>
-                <textarea id="customNotes" class="form-control" placeholder="Enter specific terms or MOM notes..." onchange="previewDocument()"></textarea>
+                <div class="form-group">
+                    <label class="form-label">Meeting Notes / Custom Terms</label>
+                    <textarea id="customNotes" class="form-control" placeholder="Enter specific terms or MOM notes..." onchange="previewDocument()"></textarea>
+                </div>
             </div>
 
             <div style="display:flex; gap:10px; margin-top:20px;">
@@ -164,41 +200,105 @@ foreach ($templates as $t) {
 
     <!-- Right Column: Live Document Preview & Actions -->
     <div>
-        <div class="card" style="margin-bottom: 16px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <span id="previewStatusBadge" class="badge badge-warning">Draft Preview</span>
-                    <strong id="previewDocTitle" style="margin-left:10px; font-size:15px; color:var(--secondary);">Select template to generate</strong>
+        <div class="preview-card-wrap" style="margin-bottom: 20px;">
+            <div class="preview-header-bar">
+                <div class="preview-title-left">
+                    <span id="previewStatusBadge" class="preview-badge-draft">
+                        <i data-feather="eye" style="width:13px; height:13px;"></i>
+                        <span>Draft Preview</span>
+                    </span>
+                    <strong id="previewDocTitle" class="preview-doc-heading">Select template to generate</strong>
+                    <span class="preview-doc-sub" id="previewDocSub">Configure the options on the left to see a live preview.</span>
                 </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div class="preview-actions-right">
                     <button id="directEditBtn" class="btn btn-outline btn-sm" onclick="toggleDirectLiveEdit()" title="Edit Content Directly on Page">
-                        <i data-feather="edit-2"></i> Edit Content
+                        <i data-feather="edit-2" style="width:14px; height:14px;"></i> Edit Content
                     </button>
                     <button class="btn btn-outline btn-sm" onclick="exportPDF()" title="Export PDF">
-                        <i data-feather="download"></i> PDF
+                        <i data-feather="download" style="width:14px; height:14px;"></i> PDF
                     </button>
                     <button class="btn btn-outline btn-sm" onclick="exportWord()" title="Export Word">
-                        <i data-feather="file-text"></i> Word (.doc)
+                        <i data-feather="file-text" style="width:14px; height:14px;"></i> Word (.doc)
                     </button>
                     <button id="handoverBtn" class="btn btn-success btn-sm" onclick="openHandoverModal()" style="display:none;">
-                        <i data-feather="send"></i> Handover to Dev Team
+                        <i data-feather="send" style="width:14px; height:14px;"></i> Handover to Dev Team
                     </button>
                 </div>
             </div>
-        </div>
 
-        <!-- Direct Edit Notice Bar (Hidden by default) -->
-        <div id="directEditBanner" style="display:none; background:#fef3c7; border:1px solid #fde047; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:13px; color:#854d0e; justify-content:space-between; align-items:center;">
-            <span><strong>Direct Edit Mode Enabled:</strong> You can edit text directly inside the document preview below. Click "Save Live Edits" when done.</span>
-            <button class="btn btn-primary btn-sm" onclick="saveDirectLiveEdits()">Save Live Edits</button>
-        </div>
+            <!-- Direct Edit Notice Bar (Hidden by default) -->
+            <div id="directEditBanner" style="display:none; background:#fef3c7; border-bottom:1px solid #fde047; padding:12px 20px; font-size:13px; color:#854d0e; justify-content:space-between; align-items:center;">
+                <span><strong>Direct Edit Mode Enabled:</strong> You can edit text directly inside the document preview below. Click "Save Live Edits" when done.</span>
+                <button class="btn btn-primary btn-sm" onclick="saveDirectLiveEdits()">Save Live Edits</button>
+            </div>
 
-        <!-- Live Document Render Area -->
-        <div id="documentRenderArea" class="document-preview-box" style="background:#f1f5f9; padding:20px; min-height:450px;">
-            <div style="text-align:center; padding:100px 20px; color:var(--text-muted); background:white; border-radius:8px;">
-                <i data-feather="file-text" style="width:48px; height:48px; stroke-width:1; margin-bottom:15px; color:#cbd5e1;"></i>
-                <h3>Dynamic Premium Document Live Preview</h3>
-                <p>Select a Client and Document Type on the left panel or load an existing saved document to render live preview.</p>
+            <!-- Live Document Render Area -->
+            <div id="documentRenderArea" class="document-preview-box">
+                <div class="preview-empty-stage">
+                    <div class="graphic-aura-wrapper">
+                        <div class="graphic-aura-bg"></div>
+                        <!-- High Fidelity Vector Illustration of Layered Documents Matching Screenshot -->
+                        <svg class="svg-doc-artwork" viewBox="0 0 240 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Background Blue Glow Document -->
+                            <g transform="translate(42, 20) rotate(-7)">
+                                <rect width="110" height="145" rx="14" fill="url(#blue_grad_bg)" filter="url(#shadow_blue)"/>
+                                <rect x="14" y="22" width="50" height="6" rx="3" fill="#ffffff" fill-opacity="0.6"/>
+                                <rect x="14" y="36" width="80" height="5" rx="2.5" fill="#ffffff" fill-opacity="0.35"/>
+                                <rect x="14" y="47" width="70" height="5" rx="2.5" fill="#ffffff" fill-opacity="0.35"/>
+                            </g>
+                            <!-- Foreground White Document -->
+                            <g transform="translate(68, 25)">
+                                <rect width="116" height="152" rx="16" fill="#ffffff" stroke="#e0edfd" stroke-width="2" filter="url(#shadow_front)"/>
+                                <rect x="18" y="24" width="46" height="7" rx="3.5" fill="#3b82f6"/>
+                                <rect x="18" y="40" width="80" height="5" rx="2.5" fill="#93c5fd" fill-opacity="0.7"/>
+                                <rect x="18" y="52" width="75" height="5" rx="2.5" fill="#cbd5e1"/>
+                                <rect x="18" y="64" width="60" height="5" rx="2.5" fill="#cbd5e1"/>
+                                <rect x="18" y="76" width="70" height="5" rx="2.5" fill="#cbd5e1"/>
+                                <rect x="18" y="88" width="55" height="5" rx="2.5" fill="#cbd5e1"/>
+                            </g>
+                            <!-- Floating Media/Photo Card on right -->
+                            <g transform="translate(142, 70) rotate(8)">
+                                <rect width="82" height="72" rx="14" fill="#ffffff" stroke="#dbeafe" stroke-width="2" filter="url(#shadow_photo)"/>
+                                <rect x="8" y="8" width="66" height="56" rx="10" fill="url(#photo_grad)"/>
+                                <!-- Mountain / Sun icons inside media card -->
+                                <circle cx="24" cy="22" r="5" fill="#60a5fa"/>
+                                <path d="M14 52 L36 32 L52 46 L62 38 L72 52 Z" fill="#93c5fd" opacity="0.8"/>
+                                <path d="M26 52 L48 36 L66 52 Z" fill="#3b82f6" opacity="0.9"/>
+                            </g>
+                            <!-- Floating Directional Spark Arrow on left -->
+                            <g transform="translate(34, 88)">
+                                <circle cx="12" cy="12" r="12" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+                                <path d="M8 12 H15 M12 9 L15 12 L12 15" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </g>
+                            <!-- Subtle Blue Particles -->
+                            <circle cx="210" cy="50" r="3" fill="#60a5fa" opacity="0.6"/>
+                            <circle cx="218" cy="58" r="1.5" fill="#93c5fd"/>
+                            <circle cx="48" cy="165" r="2.5" fill="#3b82f6" opacity="0.5"/>
+                            <!-- Gradients and Filter Definitions -->
+                            <defs>
+                                <linearGradient id="blue_grad_bg" x1="0" y1="0" x2="110" y2="145" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#60a5fa"/>
+                                    <stop offset="1" stop-color="#2563eb"/>
+                                </linearGradient>
+                                <linearGradient id="photo_grad" x1="0" y1="0" x2="66" y2="56" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#eff6ff"/>
+                                    <stop offset="1" stop-color="#dbeafe"/>
+                                </linearGradient>
+                                <filter id="shadow_blue" x="-10" y="-10" width="130" height="165" filterUnits="userSpaceOnUse">
+                                    <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#2563eb" flood-opacity="0.25"/>
+                                </filter>
+                                <filter id="shadow_front" x="-10" y="-10" width="136" height="172" filterUnits="userSpaceOnUse">
+                                    <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.08"/>
+                                </filter>
+                                <filter id="shadow_photo" x="-10" y="-10" width="102" height="92" filterUnits="userSpaceOnUse">
+                                    <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.09"/>
+                                </filter>
+                            </defs>
+                        </svg>
+                    </div>
+                    <h3 class="empty-state-title">Dynamic Premium Document Live Preview</h3>
+                    <p class="empty-state-desc">Select a Client and Document Type on the left panel or load an existing saved document to render live preview.</p>
+                </div>
             </div>
         </div>
     </div>

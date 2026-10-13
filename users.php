@@ -15,7 +15,9 @@ if (!$isSuperAdmin && !$isTeamLead) {
     exit;
 }
 
+$pageBreadcrumb = "Module 1";
 $pageTitle = "User & Team Lead Management Portal";
+$pageSubtitle = "Manage administrative permissions, developer task assignments, roles, and departmental access.";
 require_once __DIR__ . '/header.php';
 
 // Fetch all roles
