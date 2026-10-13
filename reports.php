@@ -7,23 +7,27 @@ checkAuth('reports');
 $user = getCurrentUser();
 $db = getDbConnection();
 
-$pageTitle = "Module 9 — Reports & Executive Management BI Dashboard";
+$pageBreadcrumb = "Module 9";
+$pageTitle = "Reports & Executive BI Dashboard";
+$pageSubtitle = "Real-time aggregation of transactional data across Clients, Revenue, Tasks, SLA records, and Developer Productivity.";
 require_once __DIR__ . '/header.php';
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
-    <div>
-        <h2 style="font-size:20px; font-weight:700;">Executive Business Intelligence Dashboard</h2>
-        <p style="color:var(--text-muted); font-size:14px;">Real-time aggregation of transactional data across Clients, Revenue, Tasks, SLA records, and Developer Productivity.</p>
-    </div>
-    <div style="display:flex; gap:10px;">
-        <button class="btn btn-outline" onclick="loadExecutiveSummary()">
-            <i data-feather="refresh-cw"></i> Refresh BI Data
-        </button>
-        <button class="btn btn-primary" onclick="openDrilldownModal('delayed_tasks')">
-            <i data-feather="search"></i> Executive Drill-Down
-        </button>
-    </div>
+<!-- Action Pills Navigation Bar -->
+<div class="action-pills-row">
+    <button class="btn-pill-primary" onclick="loadExecutiveSummary()">
+        <i data-feather="refresh-cw" class="icon-prefix"></i>
+        <span>Refresh BI Analytics</span>
+        <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+    </button>
+    <button class="btn-pill-white" onclick="openDrilldownModal('delayed_tasks')">
+        <i data-feather="search" class="icon-edit"></i>
+        <span>Executive Drill-Down</span>
+    </button>
+    <button class="btn-pill-white" onclick="window.print()">
+        <i data-feather="printer" class="icon-clock"></i>
+        <span>Print Summary Report</span>
+    </button>
 </div>
 
 <!-- Key Performance Metrics Row (Dynamically calculated from SQL DB) -->

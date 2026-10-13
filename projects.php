@@ -7,7 +7,11 @@ checkAuth('task-management');
 $user = getCurrentUser();
 $db = getDbConnection();
 
-$pageTitle = "Module 4 — Project & Task Management Hub";
+$pageBreadcrumb = "Module 4";
+$pageTitle = ($user['role'] === 'Developer') ? 'My Assigned Tasks Workspace' : 'Project & Task Management Hub';
+$pageSubtitle = ($user['role'] === 'Developer') 
+    ? 'Manage assigned development tasks, submit completed work for Team Lead review, and respond to revisions.' 
+    : 'Assign tasks to developers, enforce server-side SLAs, review submitted code, and manage client approvals.';
 require_once __DIR__ . '/header.php';
 
 // Fetch developers and staff for task assignment
@@ -18,27 +22,45 @@ $clients = $db->query("SELECT * FROM clients ORDER BY company_name ASC")->fetchA
 $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_name FROM projects p JOIN clients c ON p.client_id = c.id LEFT JOIN users u ON p.team_lead_id = u.id ORDER BY p.id DESC")->fetchAll();
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px;">
-    <div>
-        <h2 style="font-size:20px; font-weight:700;">
-            <?= $user['role'] === 'Developer' ? ' My Assigned Tasks Workspace' : 'Team Lead Project & Task Management Hub' ?>
-        </h2>
-        <p style="color:var(--text-muted); font-size:14px;">
-            <?= $user['role'] === 'Developer' 
-                ? 'Manage assigned development tasks, submit completed work for Team Lead review, and respond to revisions.' 
-                : 'Assign tasks to developers, enforce server-side SLAs, review submitted code, and manage client approvals.' ?>
-        </p>
-    </div>
-    <div style="display:flex; gap:10px;">
-        <?php if ($user['role'] !== 'Developer'): ?>
-            <button class="btn btn-primary" onclick="openCreateTaskModal()">
-                <i data-feather="plus-circle"></i> + Create & Assign Task
-            </button>
-            <button class="btn btn-outline" onclick="openCreateProjectModal()">
-                <i data-feather="folder-plus"></i> + New Project
-            </button>
-        <?php endif; ?>
-    </div>
+<!-- Action Pills Navigation Bar (Harmonized with Design System) -->
+<div class="action-pills-row">
+    <?php if ($user['role'] !== 'Developer'): ?>
+        <button class="btn-pill-primary" onclick="openCreateTaskModal()">
+            <i data-feather="plus" class="icon-prefix"></i>
+            <span>+ Create & Assign Task</span>
+            <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+        </button>
+        <button class="btn-pill-white" onclick="openCreateProjectModal()">
+            <i data-feather="folder-plus" class="icon-folder"></i>
+            <span>+ New Project</span>
+        </button>
+        <button class="btn-pill-white" onclick="document.getElementById('filterStatus').value=''; loadTasks();">
+            <i data-feather="list" class="icon-tag"></i>
+            <span>All Tasks Queue</span>
+        </button>
+        <button class="btn-pill-white" onclick="document.getElementById('filterStatus').value='IN PROGRESS'; loadTasks();">
+            <i data-feather="clock" class="icon-clock"></i>
+            <span>Active SLAs</span>
+        </button>
+        <button class="btn-pill-white" onclick="loadTasks()">
+            <i data-feather="refresh-cw" class="icon-edit"></i>
+            <span>Refresh Tasks</span>
+        </button>
+    <?php else: ?>
+        <button class="btn-pill-primary" onclick="document.getElementById('filterStatus').value='IN PROGRESS'; loadTasks();">
+            <i data-feather="play-circle" class="icon-prefix"></i>
+            <span>My Active Tasks</span>
+            <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+        </button>
+        <button class="btn-pill-white" onclick="document.getElementById('filterStatus').value='REVISION REQUIRED'; loadTasks();">
+            <i data-feather="alert-triangle" class="icon-edit"></i>
+            <span>Revisions Needed</span>
+        </button>
+        <button class="btn-pill-white" onclick="loadTasks()">
+            <i data-feather="refresh-cw" class="icon-clock"></i>
+            <span>Refresh Workspace</span>
+        </button>
+    <?php endif; ?>
 </div>
 
 <!-- Metrics Cards Bar -->
@@ -349,17 +371,65 @@ $projects = $db->query("SELECT p.*, c.company_name, u.full_name as team_lead_nam
 
                 if (userRole === 'Developer') {
                     area.innerHTML = `
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">MY TOTAL TASKS</p><h2>${m.total}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">IN PROGRESS</p><h2 style="color:#0284c7">${m.in_progress}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">UNDER REVIEW</p><h2 style="color:#d97706">${m.under_review}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">REVISION NEEDED</p><h2 style="color:#dc2626">${m.revision}</h2></div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:0.5px;">MY TOTAL TASKS</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:14px;">📋</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#0f172a;">${m.total}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#0284c7; letter-spacing:0.5px;">IN PROGRESS</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#e0f2fe; color:#0284c7; display:flex; align-items:center; justify-content:center; font-size:14px;">⚡</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#0284c7;">${m.in_progress}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.5px;">UNDER REVIEW</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:14px;">🔍</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#d97706;">${m.under_review}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#dc2626; letter-spacing:0.5px;">REVISION NEEDED</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#fee2e2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:14px;">⚠️</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#dc2626;">${m.revision}</div>
+                        </div>
                     `;
                 } else {
                     area.innerHTML = `
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">ACTIVE PROJECTS</p><h2>${m.total_projects}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">AWAITING REVIEW</p><h2 style="color:#d97706">${m.awaiting_review}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">SLA BREACHES</p><h2 style="color:#dc2626">${m.sla_breaches}</h2></div>
-                        <div class="card" style="margin-bottom:0;"><p class="form-label">COMPLETED TASKS</p><h2 style="color:#16a34a">${m.completed}</h2></div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:0.5px;">ACTIVE PROJECTS</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#eff6ff; color:#2563eb; display:flex; align-items:center; justify-content:center; font-size:14px;">📁</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#0f172a;">${m.total_projects}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#d97706; letter-spacing:0.5px;">AWAITING REVIEW</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; font-size:14px;">⏳</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#d97706;">${m.awaiting_review}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#dc2626; letter-spacing:0.5px;">SLA BREACHES</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#fee2e2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:14px;">🚨</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#dc2626;">${m.sla_breaches}</div>
+                        </div>
+                        <div class="card" style="margin-bottom:0; padding:18px 20px; border-radius:18px; border:1px solid #edf2f7; box-shadow:0 2px 12px rgba(15,23,42,0.03);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; color:#16a34a; letter-spacing:0.5px;">COMPLETED TASKS</span>
+                                <div style="width:32px; height:32px; border-radius:8px; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; font-size:14px;">✅</div>
+                            </div>
+                            <div style="font-size:26px; font-weight:800; color:#16a34a;">${m.completed}</div>
+                        </div>
                     `;
                 }
             });

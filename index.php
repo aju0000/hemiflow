@@ -7,7 +7,9 @@ checkAuth();
 $user = getCurrentUser();
 $db = getDbConnection();
 
-$pageTitle = "HemiFlow Portal Hub";
+$pageBreadcrumb = "Main Portal";
+$pageTitle = "Agency Operations Hub";
+$pageSubtitle = "Central workspace for proposals, client contracts, engineering tasks, and business performance.";
 require_once __DIR__ . '/header.php';
 
 // Fetch quick metrics

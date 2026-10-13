@@ -84,9 +84,13 @@
         });
     }
 
-    if (typeof feather !== 'undefined') {
-        feather.replace();
+    function refreshIcons() {
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
     }
+    refreshIcons();
+    document.addEventListener('DOMContentLoaded', refreshIcons);
 </script>
 </body>
 </html>

@@ -7,7 +7,9 @@ checkAuth('client-management');
 $user = getCurrentUser();
 $db = getDbConnection();
 
+$pageBreadcrumb = "Module 2";
 $pageTitle = "Client Management & Repository";
+$pageSubtitle = "Manage accounts, portal credentials, package subscriptions, and generated document repository.";
 require_once __DIR__ . '/header.php';
 
 $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
@@ -20,22 +22,21 @@ $clients = $db->query("SELECT c.*, u.full_name as created_by_name,
                         ORDER BY c.id DESC")->fetchAll();
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; flex-wrap:wrap; gap:12px;">
-    <div>
-        <h2 style="font-size:20px; font-weight:700;">Client Directory</h2>
-        <p style="color:var(--text-muted); font-size:14px;">Manage accounts, portal credentials, package subscriptions, and generated document repository.</p>
-    </div>
-    <div style="display:flex; gap:8px;">
-        <button class="btn btn-outline" onclick="openServicePackagesModal()">
-            <i data-feather="package"></i> Service Packages
-        </button>
-        <button class="btn btn-primary" onclick="openAddClientModal()">
-            <i data-feather="user-plus"></i> + Add New Client
-        </button>
-        <a href="template_generator.php" class="btn btn-outline">
-            <i data-feather="file-plus"></i> Generate Document
-        </a>
-    </div>
+<!-- Action Pills Navigation Bar -->
+<div class="action-pills-row">
+    <button class="btn-pill-primary" onclick="openAddClientModal()">
+        <i data-feather="user-plus" class="icon-prefix"></i>
+        <span>+ Add New Client</span>
+        <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+    </button>
+    <button class="btn-pill-white" onclick="openServicePackagesModal()">
+        <i data-feather="package" class="icon-folder"></i>
+        <span>Service Packages</span>
+    </button>
+    <a href="template_generator.php" class="btn-pill-white">
+        <i data-feather="file-plus" class="icon-tag"></i>
+        <span>Generate Document</span>
+    </a>
 </div>
 
 <div class="card">
