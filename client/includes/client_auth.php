@@ -11,6 +11,23 @@ require_once __DIR__ . '/../../db.php';
  * Require active Client session. Redirects to /client/login.php if unauthorized.
  */
 function requireClientAuth() {
+    // 1. Support active Super Admin / Admin preview session
+    if (isset($_SESSION['impersonator_user']) && !empty($_SESSION['client_id'])) {
+        return;
+    }
+
+    // 2. Direct preview link for Super Admin
+    if (isset($_SESSION['user']['role']) && in_array($_SESSION['user']['role'], ['Super Admin', 'Admin'])) {
+        $previewClientId = intval($_GET['client_id'] ?? ($_SESSION['client_id'] ?? 0));
+        if ($previewClientId > 0) {
+            $_SESSION['impersonator_user'] = $_SESSION['user'];
+            $_SESSION['role'] = 'CLIENT';
+            $_SESSION['client_id'] = $previewClientId;
+            $_SESSION['module'] = 'client_dashboard';
+            return;
+        }
+    }
+
     if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'CLIENT' || empty($_SESSION['client_id'])) {
         if (isset($_GET['action']) || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)) {
             header('Content-Type: application/json');

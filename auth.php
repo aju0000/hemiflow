@@ -40,7 +40,13 @@ function loginUser($username, $password, $requiredModule = null) {
 
     // Super Admin has access to all modules
     if ($user['role_name'] === 'Super Admin') {
-        $allowedModules = ['sales', 'client-management', 'template-generator', 'task-management', 'reports', 'user-management'];
+        $allowedModules = ['sales', 'client-management', 'template-generator', 'task-management', 'reports', 'user-management', 'hr-management'];
+    }
+
+    if ($user['role_name'] === 'HR') {
+        if (!in_array('hr-management', $allowedModules)) {
+            $allowedModules[] = 'hr-management';
+        }
     }
 
     // Backend Module Permission Enforcement
@@ -97,11 +103,111 @@ function hasModuleAccess($moduleCode) {
         return isset($user['role']) && in_array($user['role'], ['Super Admin', 'Admin']);
     }
 
+    // Module 5: HR Management access rule
+    // Internal agency staff (Super Admin, HR, Leads, Developers, Sales) have access to HR (admin or employee self-service).
+    // Clients are strictly denied.
+    if ($moduleCode === 'hr-management' || $moduleCode === 'hr') {
+        if (isset($user['role']) && ($user['role'] === 'Client' || !empty($user['client_id']))) {
+            return false;
+        }
+        return true;
+    }
+
     if (!isset($user['allowed_modules']) || !is_array($user['allowed_modules'])) {
         return false;
     }
 
     return in_array($moduleCode, $user['allowed_modules']);
+}
+
+/**
+ * Check if current user has HR administrative privileges (Super Admin, Agency Admin, HR role)
+ */
+function isHrAdmin() {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    if (isset($user['role']) && in_array($user['role'], ['Super Admin', 'Agency Admin', 'HR'])) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Check if current user is a Team Lead or Manager (includes DM Lead and any *Lead* role)
+ */
+function isTeamLeadOrManager() {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    if (isHrAdmin()) return true;
+    $role = $user['role'] ?? '';
+    $roleId = intval($user['role_id'] ?? 0);
+    if (in_array($role, ['Team Lead', 'DM Lead', 'Manager', 'Admin']) || in_array($roleId, [1, 2, 4, 18])) {
+        return true;
+    }
+    return stripos($role, 'Lead') !== false;
+}
+
+/**
+ * Check if current user has Lead or Admin privileges for project & task management
+ */
+function isLeadOrAdmin() {
+    $user = getCurrentUser();
+    if (!$user) return false;
+    $role = $user['role'] ?? '';
+    $roleId = intval($user['role_id'] ?? 0);
+    if (in_array($role, ['Super Admin', 'Agency Admin', 'Admin', 'Team Lead', 'DM Lead', 'Manager']) || in_array($roleId, [1, 2, 4, 18])) {
+        return true;
+    }
+    return stripos($role, 'Lead') !== false;
+}
+
+/**
+ * Get chat and group creation privileges for a user (live from DB so admin updates apply immediately)
+ */
+function getUserChatPrivileges($userId = null) {
+    $user = getCurrentUser();
+    $uid = $userId ? intval($userId) : intval($user['id'] ?? 0);
+    if ($uid <= 0) {
+        return ['can_chat' => false, 'can_create_group' => false];
+    }
+    $db = getDbConnection();
+    try {
+        $stmt = $db->prepare("SELECT role_id, is_active, COALESCE(can_chat, 1) as can_chat, COALESCE(can_create_group, 1) as can_create_group FROM users WHERE id = ?");
+        $stmt->execute([$uid]);
+        $row = $stmt->fetch();
+        if (!$row || !$row['is_active'] || intval($row['role_id']) === 7) {
+            return ['can_chat' => false, 'can_create_group' => false];
+        }
+        return [
+            'can_chat' => intval($row['can_chat']) === 1,
+            'can_create_group' => intval($row['can_chat']) === 1 && intval($row['can_create_group']) === 1
+        ];
+    } catch (Exception $e) {
+        $isClient = ($user && (($user['role'] ?? '') === 'Client' || ($user['role'] ?? '') === 'CLIENT' || intval($user['role_id'] ?? 0) === 7));
+        return ['can_chat' => !$isClient, 'can_create_group' => !$isClient];
+    }
+}
+
+/**
+ * Get current employee record for logged-in user
+ */
+function getCurrentEmployee() {
+    $user = getCurrentUser();
+    if (!$user) return null;
+    $db = getDbConnection();
+    try {
+        $stmt = $db->prepare("SELECT e.*, d.name as department_name, des.title as designation_title,
+                              m.full_name as reporting_manager_name
+                              FROM employees e
+                              LEFT JOIN departments d ON e.department_id = d.id
+                              LEFT JOIN designations des ON e.designation_id = des.id
+                              LEFT JOIN employees m ON e.reporting_manager_id = m.id
+                              WHERE e.user_id = ?");
+        $stmt->execute([$user['id']]);
+        return $stmt->fetch();
+    } catch (Exception $e) {
+        return null;
+    }
 }
 
 /**

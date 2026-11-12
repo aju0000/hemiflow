@@ -155,6 +155,17 @@ $pendingApprNum = $pendingApprCount->fetchColumn();
     </style>
 </head>
 <body>
+<?php if (isset($_SESSION['impersonator_user'])): ?>
+<div style="background: linear-gradient(90deg, #1e293b, #0f172a); border-bottom: 3px solid #3b82f6; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; color: #ffffff; font-size: 13px; z-index: 99999; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+    <div style="display:flex; align-items:center; gap:10px;">
+        <span style="background:#2563eb; color:#ffffff; font-size:11px; font-weight:800; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">Super Admin Mode</span>
+        <span style="color:#e2e8f0;">Viewing live Client Portal for <strong><?= htmlspecialchars($clientData['company_name']) ?></strong></span>
+    </div>
+    <a href="/client_details.php?id=<?= $clientId ?>&exit_preview=1" class="btn btn-sm btn-outline" style="background:#2563eb; color:#ffffff; border:none; padding:5px 14px; font-size:12px; font-weight:700; text-decoration:none; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+        <i data-feather="arrow-left" style="width:14px; height:14px;"></i> Return to Admin Hub
+    </a>
+</div>
+<?php endif; ?>
 <div class="client-layout">
 
     <!-- Client Sidebar Navigation -->

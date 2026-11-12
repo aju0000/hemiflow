@@ -69,6 +69,9 @@ require_once __DIR__ . '/header.php';
         <button id="tabBtn3" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(3)">
             Task Status & SLA Analytics
         </button>
+        <button id="tabBtn4" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(4)">
+            Workforce & HR Operations
+        </button>
     </div>
 
     <!-- TAB 1: Developer Productivity Leaderboard -->
@@ -142,6 +145,49 @@ require_once __DIR__ . '/header.php';
                 <h4 style="font-size:14px; font-weight:700; color:#334155; margin-bottom:10px;">SLA Compliance Metrics</h4>
                 <div id="slaComplianceDetails" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: Workforce & HR Operations -->
+    <div id="tabContent4" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="font-size:16px; font-weight:700;">Workforce Headcount & Agency HR Analytics</h3>
+            <a href="hr.php" class="btn btn-primary btn-sm">Open Module 5 HR Hub</a>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:20px;">
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Total Workforce</p>
+                <h2 id="hr_total_emps" style="font-size:24px; font-weight:800; color:#2563eb; margin:4px 0;">--</h2>
+                <small id="hr_active_sub" style="color:#64748b; font-size:12px;">Active Employees</small>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Present Today</p>
+                <h2 id="hr_present_today" style="font-size:24px; font-weight:800; color:#16a34a; margin:4px 0;">--</h2>
+                <small style="color:#16a34a; font-size:12px;">Office & Remote Attendance</small>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Pending Leave Approvals</p>
+                <h2 id="hr_pending_leaves" style="font-size:24px; font-weight:800; color:#d97706; margin:4px 0;">--</h2>
+                <small style="color:#d97706; font-size:12px;">Pending Manager Review</small>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Code</th>
+                        <th>Total Assigned</th>
+                        <th>Active Staff</th>
+                        <th>Inactive Staff</th>
+                    </tr>
+                </thead>
+                <tbody id="hrDeptHeadcountBody">
+                    <tr><td colspan="5" style="text-align:center; padding:20px;">Loading HR headcount metrics...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -274,13 +320,57 @@ require_once __DIR__ . '/header.php';
     }
 
     function switchTab(num) {
-        for (let i = 1; i <= 3; i++) {
-            document.getElementById(`tabContent${i}`).style.display = i === num ? 'block' : 'none';
+        for (let i = 1; i <= 4; i++) {
+            const content = document.getElementById(`tabContent${i}`);
+            if (content) content.style.display = i === num ? 'block' : 'none';
             const btn = document.getElementById(`tabBtn${i}`);
-            btn.style.borderBottomColor = i === num ? '#2563eb' : 'transparent';
-            btn.style.fontWeight = i === num ? '700' : '500';
-            btn.style.color = i === num ? '#2563eb' : 'var(--text)';
+            if (btn) {
+                btn.style.borderBottomColor = i === num ? '#2563eb' : 'transparent';
+                btn.style.fontWeight = i === num ? '700' : '500';
+                btn.style.color = i === num ? '#2563eb' : 'var(--text)';
+            }
         }
+        if (num === 4) {
+            loadHrBiAnalytics();
+        }
+    }
+
+    function loadHrBiAnalytics() {
+        // Fetch HR metrics
+        fetch('api.php?action=get_hr_dashboard_metrics')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                document.getElementById('hr_total_emps').textContent = data.metrics.total_employees;
+                document.getElementById('hr_active_sub').textContent = `Active Staff: ${data.metrics.active_employees}`;
+                document.getElementById('hr_present_today').textContent = data.metrics.present_today;
+                document.getElementById('hr_pending_leaves').textContent = data.metrics.pending_leave_requests;
+            });
+
+        // Fetch department headcount
+        fetch('api.php?action=get_hr_reports_data&report_type=department_headcount')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const tbody = document.getElementById('hrDeptHeadcountBody');
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">No department records found.</td></tr>';
+                    return;
+                }
+                let html = '';
+                data.data.forEach(d => {
+                    html += `
+                        <tr>
+                            <td><strong>${d.name}</strong></td>
+                            <td>${d.code || '--'}</td>
+                            <td><strong>${d.total_headcount}</strong></td>
+                            <td><span class="badge badge-primary">${d.active_count}</span></td>
+                            <td><span class="badge badge-secondary">${d.inactive_count}</span></td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            });
     }
 
     function openDrilldownModal(type) {

@@ -9,6 +9,7 @@ echo "Initializing Agency OS Database for Module 4 Project & Task Management...\
 
 // Drop existing tables for fresh setup if needed
 $tables = [
+    'chat_messages', 'chat_participants', 'chat_conversations', 'project_competitors',
     'sms_logs', 'client_tokens', 'client_notifications', 'client_meetings',
     'escalations', 'sla_records', 'client_approvals', 'task_reviews',
     'task_status_history', 'task_activities', 'task_attachments', 'task_comments',
@@ -31,6 +32,8 @@ $db->exec("CREATE TABLE users (
     role_id INTEGER NOT NULL,
     client_id INTEGER DEFAULT NULL,
     department VARCHAR(100) DEFAULT 'General',
+    can_chat INTEGER DEFAULT 1,
+    can_create_group INTEGER DEFAULT 1,
     is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -154,15 +157,49 @@ $db->exec("CREATE TABLE projects (
     service_id INTEGER,
     project_name VARCHAR(200) NOT NULL,
     description TEXT,
+    about_project TEXT,
+    project_url VARCHAR(255),
+    deliverables_summary TEXT,
+    target_audience TEXT,
+    start_date DATE,
+    budget_info VARCHAR(150),
     priority VARCHAR(20) DEFAULT 'Medium',
     status VARCHAR(50) DEFAULT 'In Progress', -- Pending, In Progress, Under Review, Completed
     team_lead_id INTEGER NOT NULL,
+    department VARCHAR(100) DEFAULT 'Development',
     deadline DATE,
+    is_current INTEGER DEFAULT 1,
     created_by INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(client_id) REFERENCES clients(id),
     FOREIGN KEY(team_lead_id) REFERENCES users(id),
     FOREIGN KEY(created_by) REFERENCES users(id)
+)");
+
+// 10b. Project Competitors Details
+$db->exec("CREATE TABLE project_competitors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    competitor_name VARCHAR(200) NOT NULL,
+    website_url VARCHAR(255) DEFAULT NULL,
+    social_links VARCHAR(255) DEFAULT NULL,
+    strengths TEXT DEFAULT NULL,
+    weaknesses TEXT DEFAULT NULL,
+    notes TEXT DEFAULT NULL,
+    created_by INTEGER DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+)");
+
+// 11b. Task Assignments (Multiple Assignees & Observers)
+$db->exec("CREATE TABLE task_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role_type VARCHAR(20) DEFAULT 'assignee', -- 'assignee', 'observer', 'lead'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 )");
 
 // 11. Tasks (Module 4 Core Entity with Full Details)
@@ -176,10 +213,14 @@ $db->exec("CREATE TABLE tasks (
     service_id INTEGER,
     department VARCHAR(100) DEFAULT 'Development',
     assigned_to INTEGER,
+    assignees_json TEXT DEFAULT '[]',
+    observers_json TEXT DEFAULT '[]',
     team_lead_id INTEGER NOT NULL,
     created_by INTEGER NOT NULL,
     priority VARCHAR(20) DEFAULT 'Medium', -- Low, Medium, High, Urgent
     status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, IN PROGRESS, UNDER REVIEW, REVISION REQUIRED, SENT FOR CLIENT APPROVAL, CLIENT REVISION REQUESTED, COMPLETED, DELAYED, ESCALATED
+    start_date DATETIME,
+    end_date DATETIME,
     deadline DATETIME,
     sla_hours INTEGER DEFAULT 24,
     sla_start_time DATETIME,
@@ -196,6 +237,17 @@ $db->exec("CREATE TABLE tasks (
     FOREIGN KEY(assigned_to) REFERENCES users(id),
     FOREIGN KEY(team_lead_id) REFERENCES users(id),
     FOREIGN KEY(created_by) REFERENCES users(id)
+)");
+
+// 11b. Task Assignments (Multiple Assignees & Observers)
+$db->exec("CREATE TABLE task_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role_type VARCHAR(20) DEFAULT 'assignee', -- 'assignee', 'observer', 'lead'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id)
 )");
 
 // 12. Task Comments
@@ -332,6 +384,40 @@ $db->exec("CREATE TABLE sms_logs (
     provider_response TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(client_id) REFERENCES clients(id) ON DELETE CASCADE
+)");
+
+// 21. Internal Employee Chat Conversations, Participants & Messages
+$db->exec("CREATE TABLE chat_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type VARCHAR(20) NOT NULL DEFAULT 'direct',
+    title VARCHAR(150) DEFAULT NULL,
+    description VARCHAR(255) DEFAULT NULL,
+    created_by INTEGER NOT NULL,
+    last_message_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)");
+
+$db->exec("CREATE TABLE chat_participants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role VARCHAR(20) DEFAULT 'member',
+    last_read_at DATETIME DEFAULT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(conversation_id, user_id),
+    FOREIGN KEY(conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)");
+
+$db->exec("CREATE TABLE chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    message_type VARCHAR(20) DEFAULT 'text',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE
 )");
 
 // Seed Roles

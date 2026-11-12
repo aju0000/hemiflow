@@ -5,7 +5,11 @@ require_once __DIR__ . '/auth.php';
 checkAuth('task-management');
 
 $user = getCurrentUser();
+$db = getDbConnection();
 $taskId = intval($_GET['id'] ?? 0);
+
+$canManageObservers = in_array($user['role'], ['Super Admin', 'Admin', 'Team Lead', 'Manager']) || in_array(intval($user['role_id'] ?? 0), [1, 4]);
+$allStaffUsers = $canManageObservers ? $db->query("SELECT u.id, u.full_name, u.username, u.department, r.name as role_name FROM users u JOIN roles r ON u.role_id = r.id WHERE u.is_active = 1 ORDER BY u.full_name ASC")->fetchAll() : [];
 
 $pageTitle = "Task Workspace Details";
 require_once __DIR__ . '/header.php';
@@ -114,9 +118,26 @@ require_once __DIR__ . '/header.php';
                 <h3 class="card-title">Task Metadata</h3>
             </div>
             <div style="display:flex; flex-direction:column; gap:12px; font-size:13px;">
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:var(--text-muted);">Assigned Developer:</span>
-                    <strong id="m_assigned_to">Loading...</strong>
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <span style="color:var(--text-muted);">Assigned Members:</span>
+                    <div id="m_assigned_to" style="text-align:right; font-weight:700;">Loading...</div>
+                </div>
+                <div style="border-top:1px dashed #e2e8f0; padding-top:10px; margin-top:2px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="color:var(--text-muted); font-weight:600;">Observers (Watchers):</span>
+                        <span id="m_observers_count" class="badge" style="background:#fae8ff; color:#a21caf; font-size:10px; font-weight:700;">0 Observers</span>
+                    </div>
+                    <div id="m_observers" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;">None</div>
+                    <?php if ($canManageObservers): ?>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <select id="dt_add_observer_select" class="form-select" style="font-size:11.5px; padding:3px 8px; border-color:#d8b4fe;" onchange="handleTaskObserverAdd(this.value)">
+                            <option value="">+ Add Observer...</option>
+                            <?php foreach ($allStaffUsers as $su): ?>
+                                <option value="<?= $su['id'] ?>"><?= htmlspecialchars($su['full_name']) ?> (<?= htmlspecialchars($su['role_name'] ?? $su['department']) ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div style="display:flex; justify-content:space-between;">
                     <span style="color:var(--text-muted);">Team Lead:</span>
@@ -186,6 +207,8 @@ require_once __DIR__ . '/header.php';
     const taskId = <?= $taskId ?>;
     const userRole = <?= json_encode($user['role']) ?>;
     const userId = <?= json_encode($user['id']) ?>;
+    const isLeadOrAdminUser = <?= json_encode(isLeadOrAdmin()) ?>;
+    const canManageObservers = <?= json_encode($canManageObservers) ?>;
 
     document.addEventListener('DOMContentLoaded', () => {
         if (taskId > 0) {
@@ -218,16 +241,42 @@ require_once __DIR__ . '/header.php';
                 const statusSel = document.getElementById('quickStatusSelect');
                 if (statusSel) statusSel.value = t.status;
 
-                // Metadata
-                document.getElementById('m_assigned_to').textContent = t.assigned_to_name || 'Unassigned';
+                // Metadata - Multiple Assignees
+                if (data.task.assignees && data.task.assignees.length > 0) {
+                    document.getElementById('m_assigned_to').innerHTML = data.task.assignees.map(a => 
+                        `<span class="badge" style="background:#dbeafe; color:#1e40af; font-size:11.5px; margin:2px 0 2px 4px; display:inline-block;">👤 ${escapeHtml(a.full_name)}</span>`
+                    ).join('');
+                } else {
+                    document.getElementById('m_assigned_to').textContent = t.assigned_to_name || 'Unassigned';
+                }
+
+                // Metadata - Observers
+                const obsCountBadge = document.getElementById('m_observers_count');
+                const obsList = data.task.observers || [];
+                if (obsCountBadge) {
+                    obsCountBadge.textContent = `${obsList.length} Observer${obsList.length === 1 ? '' : 's'}`;
+                }
+
+                if (obsList.length > 0) {
+                    document.getElementById('m_observers').innerHTML = obsList.map(o => `
+                        <span class="badge" style="background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; font-size:11px; padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:5px; margin:2px 0;">
+                            <span>👁️ ${escapeHtml(o.full_name)}</span>
+                            ${canManageObservers ? `<button type="button" onclick="handleTaskObserverRemove(${o.id})" style="background:none; border:none; color:#7e22ce; font-size:13px; font-weight:700; cursor:pointer; padding:0 2px; line-height:1;" title="Remove observer">&times;</button>` : ''}
+                        </span>
+                    `).join('');
+                } else {
+                    document.getElementById('m_observers').innerHTML = '<span style="color:#94a3b8; font-style:italic;">No observers</span>';
+                }
+
                 document.getElementById('m_team_lead').textContent = t.team_lead_name || 'Ajmal Team Lead';
                 document.getElementById('m_department').textContent = t.department;
                 document.getElementById('m_priority').textContent = t.priority;
                 document.getElementById('m_sla_hours').textContent = `${t.sla_hours} Hours`;
                 document.getElementById('m_sla_due').textContent = t.sla_due_time ? t.sla_due_time.substring(0, 16) : 'N/A';
 
-                // Render Buttons
-                if (userRole === 'Developer' && t.assigned_to == userId && t.status !== 'COMPLETED' && t.status !== 'UNDER REVIEW') {
+                // Render Buttons (Allow any assigned employee to submit work)
+                const isAssignedDev = t.assigned_to == userId || (data.task.assignees && data.task.assignees.some(a => a.id == userId));
+                if (!isLeadOrAdminUser && isAssignedDev && t.status !== 'COMPLETED' && t.status !== 'UNDER REVIEW') {
                     if (document.getElementById('btnSubmitWork')) document.getElementById('btnSubmitWork').style.display = 'inline-flex';
                 }
 
@@ -236,6 +285,59 @@ require_once __DIR__ . '/header.php';
                 renderReviews(data.reviews);
                 renderActivities(data.activities);
             });
+    }
+
+    function handleTaskObserverAdd(userId) {
+        const uId = parseInt(userId);
+        if (!uId) return;
+        fetch('api.php?action=update_task_observers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                action: 'add',
+                user_id: uId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadTaskDetails();
+            } else {
+                alert('Error: ' + data.message);
+            }
+            const sel = document.getElementById('dt_add_observer_select');
+            if (sel) sel.value = '';
+        })
+        .catch(err => {
+            alert('Failed to add observer.');
+        });
+    }
+
+    function handleTaskObserverRemove(userId) {
+        const uId = parseInt(userId);
+        if (!uId) return;
+        if (!confirm('Remove this observer from task?')) return;
+        fetch('api.php?action=update_task_observers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                action: 'remove',
+                user_id: uId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadTaskDetails();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('Failed to remove observer.');
+        });
     }
 
     function renderComments(comments) {

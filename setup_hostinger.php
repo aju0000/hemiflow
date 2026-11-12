@@ -29,12 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sql = file_get_contents($sqlFile);
                 $pdo->exec($sql);
 
-                // Re-seed Document Templates
-                if (file_exists(__DIR__ . '/seed_templates.php')) {
-                    include __DIR__ . '/seed_templates.php';
-                }
-
-                // Update db.php file contents
+                // Update db.php file contents first so seed_templates uses the live MySQL connection
                 $dbPhpContent = "<?php\n"
                     . "define('DB_TYPE', 'mysql');\n"
                     . "define('DB_HOST', '" . addslashes($dbHost) . "');\n"
@@ -55,6 +50,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . "}\n";
 
                 file_put_contents(__DIR__ . '/db.php', $dbPhpContent);
+
+                // Re-seed Document Templates into MySQL
+                if (file_exists(__DIR__ . '/seed_templates.php')) {
+                    include __DIR__ . '/seed_templates.php';
+                }
 
                 $msg = "SUCCESS! HemiFlow Database successfully configured and imported into Hostinger MySQL! You can now log in.";
             }

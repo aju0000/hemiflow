@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: template_generator.php');
         } elseif ($module === 'task-management') {
             header('Location: projects.php');
+        } elseif ($module === 'hr-management') {
+            header('Location: hr.php');
         } elseif ($module === 'reports') {
             header('Location: reports.php');
         } elseif ($module === 'client-management' || $module === 'sales') {
@@ -75,43 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .login-body {
             padding: 30px;
         }
-        .module-tabs {
-            display: flex;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
-        }
-        .module-tab {
-            flex: 1;
-            padding: 12px 6px;
-            text-align: center;
-            font-size: 12px;
-            font-weight: 600;
-            color: #64748b;
-            text-decoration: none;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-        .module-tab.active {
-            color: #2563eb;
-            border-bottom-color: #2563eb;
-            background: #ffffff;
-        }
-        .quick-user-btn {
-            display: block;
-            width: 100%;
-            text-align: left;
-            padding: 8px 12px;
-            margin-bottom: 6px;
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .quick-user-btn:hover {
-            background: #e2e8f0;
-        }
     </style>
 </head>
 <body>
@@ -120,17 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-header" style="display:flex; flex-direction:column; align-items:center;">
         <img src="asset/Hemiflow Blue Wave Logo.png" alt="HemiFlow Logo" style="height:48px; max-width:180px; object-fit:contain; margin-bottom:10px;">
         <h2 style="font-size: 24px; margin-bottom: 4px; font-weight:800;">HemiFlow</h2>
-        <p style="color: #94a3b8; font-size: 13px;">Centralized Agency Portal & Module Access</p>
-    </div>
-
-
-    <!-- Module Access Selection Tabs -->
-    <div class="module-tabs">
-        <a href="login.php?module=sales" class="module-tab <?= $module === 'sales' ? 'active' : '' ?>">Sales / CRM</a>
-        <a href="login.php?module=client-management" class="module-tab <?= $module === 'client-management' ? 'active' : '' ?>">Clients</a>
-        <a href="login.php?module=template-generator" class="module-tab <?= ($module === 'template-generator' || !$module) ? 'active' : '' ?>">Template Gen</a>
-        <a href="login.php?module=task-management" class="module-tab <?= $module === 'task-management' ? 'active' : '' ?>">Tasks</a>
-        <a href="login.php?module=reports" class="module-tab <?= $module === 'reports' ? 'active' : '' ?>">Reports</a>
+        <p style="color: #94a3b8; font-size: 13px;">Centralized Agency Portal</p>
     </div>
 
     <div class="login-body">
@@ -157,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <div class="form-group">
                 <label class="form-label">Username or Email</label>
-                <input type="text" name="username" id="username" class="form-control" placeholder="e.g. sales_john" required>
+                <input type="text" name="username" id="username" class="form-control" placeholder="Enter your username or email" required>
             </div>
 
             <div class="form-group">
@@ -169,35 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Log In to <?= $module ? strtoupper(htmlspecialchars($module)) : 'Agency OS' ?>
             </button>
         </form>
-
-        <!-- Quick Demo Role Switcher -->
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #cbd5e1;">
-            <p style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 10px;">QUICK DEMO USER LOGIN (Click to autofill):</p>
-            
-            <button type="button" class="quick-user-btn" onclick="fillUser('admin', 'password123')">
-                <strong>Super Admin</strong> (admin) &rarr; All Modules Access
-            </button>
-            <button type="button" class="quick-user-btn" onclick="fillUser('sales_john', 'password123')">
-                <strong>Sales Manager</strong> (sales_john) &rarr; Sales, Client & Template Generator
-            </button>
-            <button type="button" class="quick-user-btn" onclick="fillUser('lead_ajmal', 'password123')">
-                <strong>Team Lead</strong> (lead_ajmal) &rarr; Task & Project Management
-            </button>
-            <button type="button" class="quick-user-btn" onclick="fillUser('dev_rahul', 'password123')">
-                <strong>Developer</strong> (dev_rahul) &rarr; Assigned Tasks Only
-            </button>
-            <button type="button" class="quick-user-btn" onclick="fillUser('reports_sarah', 'password123')">
-                <strong>Reports Admin</strong> (reports_sarah) &rarr; Analytics & BI Dashboard
-            </button>
-        </div>
     </div>
 </div>
-
-<script>
-    function fillUser(user, pass) {
-        document.getElementById('username').value = user;
-        document.getElementById('password').value = pass;
-    }
-</script>
 </body>
 </html>

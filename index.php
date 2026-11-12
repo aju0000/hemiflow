@@ -107,6 +107,90 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
     <?php endif; ?>
 </div>
 
+<!-- Live Office Presence Overview Card -->
+<div class="card" style="margin-bottom: 24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+        <div>
+            <h3 style="font-size:16px; font-weight:800; color:#0f172a; margin:0; display:flex; align-items:center; gap:8px;">
+                <span class="presence-pulse-dot"></span>
+                <span>Live Office & Workplace Presence</span>
+            </h3>
+            <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Real-time tracking of employees who are at their desks, in meetings, or on tea breaks.</p>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openTeamPresenceModal()" style="border-radius:8px; font-size:12px; display:flex; align-items:center; gap:5px;">
+                <i data-feather="users" style="width:13px; height:13px;"></i> View Full Team Status
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Counter Row -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:14px;" id="dashPresenceChips">
+        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px; text-align:center; cursor:pointer;" onclick="openTeamPresenceModal(); filterTeamPresence('IN_OFFICE');">
+            <div style="font-size:22px; font-weight:800; color:#15803d;" id="dashPresInOffice">--</div>
+            <div style="font-size:11px; font-weight:700; color:#166534; margin-top:2px;">🟢 At Desk</div>
+        </div>
+        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px; text-align:center; cursor:pointer;" onclick="openTeamPresenceModal(); filterTeamPresence('TEA_BREAK');">
+            <div style="font-size:22px; font-weight:800; color:#b45309;" id="dashPresTea">--</div>
+            <div style="font-size:11px; font-weight:700; color:#92400e; margin-top:2px;">☕ Tea Break</div>
+        </div>
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px; text-align:center; cursor:pointer;" onclick="openTeamPresenceModal(); filterTeamPresence('AFK');">
+            <div style="font-size:22px; font-weight:800; color:#c2410c;" id="dashPresAfk">--</div>
+            <div style="font-size:11px; font-weight:700; color:#9a3412; margin-top:2px;">⏸️ AFK</div>
+        </div>
+        <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:10px; padding:10px; text-align:center; cursor:pointer;" onclick="openTeamPresenceModal(); filterTeamPresence('MEETING');">
+            <div style="font-size:22px; font-weight:800; color:#7e22ce;" id="dashPresMeeting">--</div>
+            <div style="font-size:11px; font-weight:700; color:#6b21a8; margin-top:2px;">👥 In Meeting</div>
+        </div>
+        <div style="background:#fdf2f8; border:1px solid #fbcfe8; border-radius:10px; padding:10px; text-align:center; cursor:pointer;" onclick="openTeamPresenceModal(); filterTeamPresence('LUNCH');">
+            <div style="font-size:22px; font-weight:800; color:#be185d;" id="dashPresLunch">--</div>
+            <div style="font-size:11px; font-weight:700; color:#9d174d; margin-top:2px;">🍽️ Lunch</div>
+        </div>
+    </div>
+
+    <!-- Away Staff Notice or Summary -->
+    <div id="dashAwayStaffNotice" style="padding:10px 14px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; font-size:12px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
+        <span>Loading live staff status...</span>
+    </div>
+</div>
+
+<script>
+function updateDashboardPresenceCard() {
+    fetch('api.php?action=get_team_presence')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) return;
+            const s = data.summary;
+            const elInOffice = document.getElementById('dashPresInOffice');
+            const elTea = document.getElementById('dashPresTea');
+            const elAfk = document.getElementById('dashPresAfk');
+            const elMeeting = document.getElementById('dashPresMeeting');
+            const elLunch = document.getElementById('dashPresLunch');
+            if (elInOffice) elInOffice.textContent = s.in_office_count || 0;
+            if (elTea) elTea.textContent = s.tea_break_count || 0;
+            if (elAfk) elAfk.textContent = s.afk_count || 0;
+            if (elMeeting) elMeeting.textContent = s.meeting_count || 0;
+            if (elLunch) elLunch.textContent = s.lunch_count || 0;
+
+            const notice = document.getElementById('dashAwayStaffNotice');
+            if (notice) {
+                const awayStaff = (data.staff || []).filter(st => st.is_away);
+                if (awayStaff.length === 0) {
+                    notice.innerHTML = `<span style="color:#10b981; font-weight:600;">✅ All ${s.total_staff} team members are currently active at their desks in office.</span>`;
+                } else {
+                    const names = awayStaff.map(st => `<strong>${escapeHtml(st.full_name)}</strong> (${st.status_short}${st.status_note ? ': ' + escapeHtml(st.status_note) : ''})`).join(', ');
+                    notice.innerHTML = `<span style="color:#b45309;">⚠️ <strong>${awayStaff.length} member(s) currently stepped away:</strong> ${names}</span>`;
+                }
+            }
+        })
+        .catch(err => console.error("Error updating dash presence:", err));
+}
+document.addEventListener('DOMContentLoaded', () => {
+    updateDashboardPresenceCard();
+    setInterval(updateDashboardPresenceCard, 25000);
+});
+</script>
+
 <!-- Accessible Modules Grid -->
 <div class="card">
     <div class="card-header">

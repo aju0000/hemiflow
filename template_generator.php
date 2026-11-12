@@ -221,7 +221,7 @@ foreach ($templates as $t) {
                         <i data-feather="file-text" style="width:14px; height:14px;"></i> Word (.doc)
                     </button>
                     <button id="handoverBtn" class="btn btn-success btn-sm" onclick="openHandoverModal()" style="display:none;">
-                        <i data-feather="send" style="width:14px; height:14px;"></i> Handover to Dev Team
+                        <i data-feather="send" style="width:14px; height:14px;"></i> Handover to Teams
                     </button>
                 </div>
             </div>
@@ -726,49 +726,104 @@ foreach ($templates as $t) {
     </div>
 </div>
 
-<!-- MODAL: HANDOVER TO DEV TEAM -->
-<div id="handoverModal" class="modal-overlay" style="display:none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 class="modal-title">Work Requirement Handover to Development</h3>
-            <button class="btn btn-outline btn-sm" onclick="closeModal('handoverModal')">&times;</button>
+<!-- MODAL: HANDOVER TO EXECUTION TEAMS / DEPARTMENTS -->
+<div id="handoverModal" class="modal-overlay" style="display:none; z-index:9999;">
+    <div class="modal-content" style="max-width:880px; width:95%; max-height:92vh; display:flex; flex-direction:column;">
+        <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding:16px 22px;">
+            <div>
+                <h3 class="modal-title" style="display:flex; align-items:center; gap:8px; font-size:18px;">
+                    <i data-feather="send" style="width:18px; height:18px; color:#2563eb;"></i>
+                    Sales Handover to Departments
+                </h3>
+                <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">
+                    Assign project deliverables and features directly to responsible departments & team leads.
+                </p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('handoverModal')">&times;</button>
         </div>
-        <form onsubmit="event.preventDefault(); submitHandover();">
-            <div class="modal-body">
-                <div id="ho_client_info_banner" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:600; margin-bottom:14px;">
+        <form onsubmit="event.preventDefault(); submitHandover();" style="display:flex; flex-direction:column; overflow:hidden; flex:1;">
+            <div class="modal-body" style="overflow-y:auto; padding:20px 22px; max-height:calc(92vh - 140px);">
+                
+                <!-- Client Banner -->
+                <div id="ho_client_info_banner" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:18px;">
                     Loading target client information...
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Project / Work Title *</label>
-                    <input type="text" id="ho_project_name" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Development Team Lead *</label>
-                    <select id="ho_team_lead" class="form-select" required>
-                        <option value="3">Ajmal (Team Lead - Development)</option>
-                    </select>
-                </div>
-                <div class="grid-2">
-                    <div class="form-group">
-                        <label class="form-label">Priority</label>
-                        <select id="ho_priority" class="form-select">
-                            <option value="High" selected>High</option>
-                            <option value="Urgent">Urgent</option>
-                        </select>
+
+                <!-- Section 1: Project Overview -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:20px;">
+                    <div style="font-size:13px; font-weight:700; color:#334155; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                        <i data-feather="folder" style="width:14px; height:14px; color:#475569;"></i>
+                        Project Overview
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Deadline *</label>
-                        <input type="date" id="ho_deadline" class="form-control" required value="<?= date('Y-m-d', strtotime('+14 days')) ?>">
+                    <div class="grid-2" style="margin-bottom:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-weight:600;">Project / Work Title *</label>
+                            <input type="text" id="ho_project_name" class="form-control" required placeholder="e.g. Website Redesign & Branding">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-weight:600;">Overall Target Deadline *</label>
+                            <input type="date" id="ho_deadline" class="form-control" required value="<?= date('Y-m-d', strtotime('+14 days')) ?>">
+                        </div>
+                    </div>
+                    <div class="grid-3" style="margin-bottom:12px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-weight:600;">Primary Department</label>
+                            <select id="ho_primary_department" class="form-select" onchange="onPrimaryDeptChange()">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-weight:600;">Overall Team Lead / Manager</label>
+                            <select id="ho_team_lead" class="form-select" required>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-weight:600;">Overall Priority</label>
+                            <select id="ho_priority" class="form-select">
+                                <option value="Urgent">Urgent</option>
+                                <option value="High" selected>High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-weight:600;">Handover Notes & Overall Scope Overview</label>
+                        <textarea id="ho_description" class="form-control" rows="2" placeholder="General scope, client preferences, or key milestones..."></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Work Requirement Details</label>
-                    <textarea id="ho_description" class="form-control" rows="3"></textarea>
+
+                <!-- Section 2: Features & Deliverables by Department -->
+                <div style="border:1px solid #cbd5e1; border-radius:8px; padding:16px; background:#ffffff;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                        <div>
+                            <div style="font-size:13px; font-weight:700; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
+                                <i data-feather="layers" style="width:14px; height:14px; color:#2563eb;"></i>
+                                Department Features & Deliverables
+                                <span id="ho_features_count_badge" class="badge badge-primary" style="font-size:11px; padding:2px 8px; border-radius:10px;">1 Feature</span>
+                            </div>
+                            <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">
+                                Break down work so each department receives its specific task, auto-assigned to its Team Lead.
+                            </p>
+                        </div>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addFeatureRow()" style="color:#2563eb; border-color:#93c5fd; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+                            <i data-feather="plus" style="width:13px; height:13px;"></i> Add Feature
+                        </button>
+                    </div>
+
+                    <div id="ho_features_container" style="display:flex; flex-direction:column; gap:14px;">
+                        <!-- Feature rows injected dynamically -->
+                    </div>
                 </div>
+
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="border-top:1px solid #e2e8f0; padding:14px 22px; background:#f8fafc;">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('handoverModal')">Cancel</button>
-                <button type="submit" class="btn btn-success">Approve & Handover Work</button>
+                <button type="submit" class="btn btn-success" style="font-weight:700; padding:8px 20px;">
+                    <i data-feather="check-circle" style="width:14px; height:14px; margin-right:4px;"></i>
+                    Approve & Handover Work
+                </button>
             </div>
         </form>
     </div>
@@ -797,6 +852,7 @@ foreach ($templates as $t) {
 </div>
 
 <script>
+    const currentLoggedInUser = <?= json_encode($user) ?>;
     const rawTemplates = <?= json_encode($templatesByType) ?>;
     let currentSavedDocId = null;
     let isDirectEditMode = false;
@@ -1054,18 +1110,27 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
     }
 
     function previewDocument() {
-        const clientId = document.getElementById('clientSelect').value;
-        const serviceId = document.getElementById('serviceSelect').value;
-        const templateId = document.getElementById('templateSelect').value;
+        const clientSelect = document.getElementById('clientSelect');
+        const clientId = clientSelect ? (parseInt(clientSelect.value) || 0) : 0;
+        const serviceSelect = document.getElementById('serviceSelect');
+        const serviceId = serviceSelect ? (parseInt(serviceSelect.value) || 0) : 0;
+        const templateId = document.getElementById('templateSelect') ? (parseInt(document.getElementById('templateSelect').value) || 0) : 0;
 
-        if (!clientId || !templateId) return;
+        if (!templateId) return;
 
         const customFields = {
-            AGENCY_NAME: document.getElementById('agencyName').value,
-            AGENCY_ADDRESS: document.getElementById('agencyAddress').value,
-            CUSTOM_SCOPE: document.getElementById('customScope').value,
-            CUSTOM_NOTES: document.getElementById('customNotes').value
+            AGENCY_NAME: document.getElementById('agencyName') ? document.getElementById('agencyName').value : '',
+            AGENCY_ADDRESS: document.getElementById('agencyAddress') ? document.getElementById('agencyAddress').value : '',
+            CUSTOM_SCOPE: document.getElementById('customScope') ? document.getElementById('customScope').value : '',
+            CUSTOM_NOTES: document.getElementById('customNotes') ? document.getElementById('customNotes').value : ''
         };
+
+        if (clientSelect && clientSelect.selectedOptions && clientSelect.selectedOptions[0]) {
+            const opt = clientSelect.selectedOptions[0];
+            if (opt.dataset && opt.dataset.company) customFields.CLIENT_COMPANY = opt.dataset.company;
+            if (opt.dataset && opt.dataset.contact) customFields.CLIENT_CONTACT = opt.dataset.contact;
+            if (opt.dataset && opt.dataset.email) customFields.CLIENT_EMAIL = opt.dataset.email;
+        }
 
         fetch('api.php?action=preview_document', {
             method: 'POST',
@@ -1086,7 +1151,12 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
                     document.getElementById('previewStatusBadge').textContent = 'Draft Live Preview';
                     document.getElementById('previewStatusBadge').className = 'badge badge-warning';
                 }
+            } else {
+                console.error("Preview document error:", data.message);
             }
+        })
+        .catch(err => {
+            console.error("Preview document network error:", err);
         });
     }
 
@@ -1487,49 +1557,446 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         a.click();
     }
 
-    function openQuickClientModal() { document.getElementById('quickClientModal').style.display = 'flex'; }
-    function openHandoverModal() {
+    let systemDepartments = [];
+    let systemUsers = [];
+    let handoverFeatures = [];
+
+    function populatePrimaryDeptDropdown(selectedDept = 'Development') {
+        const deptSelect = document.getElementById('ho_primary_department');
+        if (!deptSelect) return;
+        let html = '';
+        // Exclude 'Sales' - Sales is handing over work to execution departments
+        const executionDepts = systemDepartments.filter(d => (d.name || '').toLowerCase() !== 'sales');
+        executionDepts.forEach(d => {
+            const isSel = (d.name.toLowerCase() === selectedDept.toLowerCase()) ? 'selected' : '';
+            html += `<option value="${escapeHtml(d.name)}" ${isSel}>${escapeHtml(d.name)}</option>`;
+        });
+        deptSelect.innerHTML = html;
+    }
+
+    function onPrimaryDeptChange() {
+        const deptSelect = document.getElementById('ho_primary_department');
+        const leadSelect = document.getElementById('ho_team_lead');
+        if (!deptSelect || !leadSelect) return;
+
+        const selectedDept = deptSelect.value;
+        const deptLead = findDepartmentLead(selectedDept);
+
+        // Group options: Department Members first, then other Leads / Admins
+        const deptUsers = systemUsers.filter(u => u.department && u.department.toLowerCase() === selectedDept.toLowerCase());
+        const otherLeads = systemUsers.filter(u => (!u.department || u.department.toLowerCase() !== selectedDept.toLowerCase()) && (parseInt(u.role_id) === 4 || parseInt(u.role_id) === 1 || (u.role_name || '').toLowerCase().includes('lead')));
+
+        let html = '';
+        if (deptUsers.length > 0) {
+            html += `<optgroup label="${escapeHtml(selectedDept)} Team">`;
+            deptUsers.forEach(u => {
+                const isSel = deptLead && parseInt(deptLead.id) === parseInt(u.id) ? 'selected' : '';
+                html += `<option value="${u.id}" ${isSel}>${escapeHtml(u.full_name)} (${escapeHtml(u.role_name || u.department)})</option>`;
+            });
+            html += `</optgroup>`;
+        }
+
+        if (otherLeads.length > 0) {
+            html += `<optgroup label="Other Leads & Admins">`;
+            otherLeads.forEach(u => {
+                const isSel = (!deptLead && parseInt(u.role_id) === 1) ? 'selected' : '';
+                html += `<option value="${u.id}" ${isSel}>${escapeHtml(u.full_name)} (${escapeHtml(u.role_name)} - ${escapeHtml(u.department || 'Admin')})</option>`;
+            });
+            html += `</optgroup>`;
+        }
+
+        if (!html) {
+            systemUsers.forEach(u => {
+                html += `<option value="${u.id}">${escapeHtml(u.full_name)} (${escapeHtml(u.role_name)})</option>`;
+            });
+        }
+
+        leadSelect.innerHTML = html;
+    }
+
+    function guessDepartment(text) {
+        const lower = (text || '').toLowerCase();
+        if (lower.includes('design') || lower.includes('logo') || lower.includes('ui') || lower.includes('ux') || lower.includes('creative') || lower.includes('video') || lower.includes('branding') || lower.includes('graphic') || lower.includes('banner')) {
+            return 'Creative';
+        }
+        if (lower.includes('marketing') || lower.includes('seo') || lower.includes('social') || lower.includes('campaign') || lower.includes('leads') || lower.includes('ad') || lower.includes('sem') || lower.includes('content') || lower.includes('post')) {
+            return 'Marketing';
+        }
+        if (lower.includes('crm') || lower.includes('support') || lower.includes('customer') || lower.includes('calling')) {
+            return 'CRM';
+        }
+        return 'Development';
+    }
+
+    function findDepartmentLead(deptName) {
+        if (!systemUsers || systemUsers.length === 0) return null;
+        const normDept = (deptName || '').toLowerCase();
+        const deptUsers = systemUsers.filter(u => u.department && u.department.toLowerCase() === normDept);
+
+        // 1. Look for internal Lead/Manager in this department (e.g. DM Lead in Marketing)
+        let lead = deptUsers.find(u => {
+            const rName = (u.role_name || '').toLowerCase();
+            return parseInt(u.role_id) === 4 || rName.includes('lead') || rName.includes('manager');
+        });
+        if (lead) return lead;
+
+        // 2. Look for global Team Lead across company (e.g. Arun)
+        lead = systemUsers.find(u => parseInt(u.role_id) === 4 || (u.role_name || '').toLowerCase() === 'team lead');
+        if (lead) return lead;
+
+        // 3. Look for Super Admin
+        lead = systemUsers.find(u => parseInt(u.role_id) === 1 || (u.role_name || '').toLowerCase().includes('admin'));
+        if (lead) return lead;
+
+        return deptUsers[0] || systemUsers[0];
+    }
+
+    function getLeadOptionsForDepartment(deptName, selectedLeadId) {
+        const normDept = (deptName || '').toLowerCase();
+        const deptLead = findDepartmentLead(deptName);
+        const selId = selectedLeadId ? parseInt(selectedLeadId) : (deptLead ? parseInt(deptLead.id) : 0);
+
+        // Department Users & Leads
+        const deptUsers = systemUsers.filter(u => u.department && u.department.toLowerCase() === normDept);
+        const leadsAndAdmins = systemUsers.filter(u => 
+            parseInt(u.role_id) === 4 || 
+            parseInt(u.role_id) === 1 || 
+            (u.role_name || '').toLowerCase().includes('lead') || 
+            (u.role_name || '').toLowerCase().includes('manager')
+        );
+
+        let optionsHtml = '';
+        
+        // Group 1: Recommended Department Lead
+        if (deptLead) {
+            optionsHtml += `<optgroup label="Assigned Lead (${escapeHtml(deptName)})">`;
+            optionsHtml += `<option value="${deptLead.id}" ${parseInt(deptLead.id) === selId ? 'selected' : ''}>★ ${escapeHtml(deptLead.full_name)} (${escapeHtml(deptLead.role_name || deptLead.department)})</option>`;
+            optionsHtml += `</optgroup>`;
+        }
+
+        // Group 2: Other Leads & Admins
+        const otherLeads = leadsAndAdmins.filter(u => !deptLead || parseInt(u.id) !== parseInt(deptLead.id));
+        if (otherLeads.length > 0) {
+            optionsHtml += `<optgroup label="Other Leads & Managers">`;
+            otherLeads.forEach(u => {
+                optionsHtml += `<option value="${u.id}" ${parseInt(u.id) === selId ? 'selected' : ''}>${escapeHtml(u.full_name)} (${escapeHtml(u.role_name)} - ${escapeHtml(u.department || 'Admin')})</option>`;
+            });
+            optionsHtml += `</optgroup>`;
+        }
+
+        // Group 3: Other department members if needed
+        const otherDeptMembers = deptUsers.filter(u => (!deptLead || parseInt(u.id) !== parseInt(deptLead.id)) && !leadsAndAdmins.some(la => parseInt(la.id) === parseInt(u.id)));
+        if (otherDeptMembers.length > 0) {
+            optionsHtml += `<optgroup label="${escapeHtml(deptName)} Members">`;
+            otherDeptMembers.forEach(u => {
+                optionsHtml += `<option value="${u.id}" ${parseInt(u.id) === selId ? 'selected' : ''}>${escapeHtml(u.full_name)} (${escapeHtml(u.role_name || u.department)})</option>`;
+            });
+            optionsHtml += `</optgroup>`;
+        }
+
+        return optionsHtml;
+    }
+
+    function parseScopeIntoFeatures(scopeText) {
+        if (!scopeText || !scopeText.trim()) return [];
+        const lines = scopeText.split('\n')
+            .map(l => l.replace(/^[\s\-\*\•\d+\.\)]+/, '').trim())
+            .filter(l => l.length > 2);
+        
+        if (lines.length === 0) return [];
+
+        return lines.slice(0, 10).map(line => {
+            const dept = guessDepartment(line);
+            const targetDept = dept === 'Sales' ? 'Development' : dept;
+            const deptLead = findDepartmentLead(targetDept);
+            return {
+                title: line,
+                department: targetDept,
+                team_lead_id: deptLead ? parseInt(deptLead.id) : 0,
+                priority: 'High',
+                sla_hours: 48,
+                notes: ''
+            };
+        });
+    }
+
+    function renderFeatures() {
+        const container = document.getElementById('ho_features_container');
+        if (!container) return;
+
+        const countBadge = document.getElementById('ho_features_count_badge');
+        if (countBadge) {
+            countBadge.textContent = `${handoverFeatures.length} Feature${handoverFeatures.length === 1 ? '' : 's'}`;
+        }
+
+        // Exclude 'Sales' department from execution departments
+        const executionDepts = systemDepartments.filter(d => (d.name || '').toLowerCase() !== 'sales');
+
+        let html = '';
+        handoverFeatures.forEach((feat, idx) => {
+            const deptOptionsHtml = executionDepts.map(d => {
+                const isSel = (d.name.toLowerCase() === (feat.department || '').toLowerCase()) ? 'selected' : '';
+                return `<option value="${escapeHtml(d.name)}" ${isSel}>${escapeHtml(d.name)}</option>`;
+            }).join('');
+
+            // Assigned Lead options
+            const leadOptionsHtml = getLeadOptionsForDepartment(feat.department, feat.team_lead_id);
+
+            html += `
+                <div class="ho-feature-card" data-idx="${idx}" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #f1f5f9;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:12px; font-weight:700; color:#2563eb; background:#eff6ff; padding:3px 10px; border-radius:6px; border:1px solid #bfdbfe;">
+                                Feature #${idx + 1}
+                            </span>
+                            <span style="font-size:12px; color:#475569; font-weight:600;">Department Deliverable</span>
+                        </div>
+                        ${handoverFeatures.length > 1 ? `
+                            <button type="button" class="btn btn-outline btn-sm" onclick="removeFeatureRow(${idx})" style="padding:2px 8px; font-size:11px; color:#ef4444; border-color:#fca5a5;">
+                                &times; Remove Feature
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <!-- Row 1: Title and Target Department -->
+                    <div class="grid-2" style="margin-bottom:12px;">
+                        <div>
+                            <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px;">Feature / Deliverable Title *</label>
+                            <input type="text" class="form-control ho-feat-title" value="${escapeHtml(feat.title)}" placeholder="e.g. Website Frontend & UI" oninput="updateFeatureData(${idx}, 'title', this.value)" required>
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px;">Target Department *</label>
+                            <select class="form-select ho-feat-dept" onchange="onFeatureDeptChanged(${idx}, this.value)" required>
+                                ${deptOptionsHtml}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Assigned Lead, Priority, SLA -->
+                    <div class="grid-3" style="margin-bottom:12px;">
+                        <div>
+                            <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>Assigned Lead</span>
+                                <span class="badge" style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:9.5px; font-weight:700; padding:1px 6px;">Auto-routed</span>
+                            </label>
+                            <select class="form-select ho-feat-lead" onchange="updateFeatureData(${idx}, 'team_lead_id', parseInt(this.value) || 0)">
+                                ${leadOptionsHtml}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px;">Priority</label>
+                            <select class="form-select ho-feat-priority" onchange="updateFeatureData(${idx}, 'priority', this.value)">
+                                <option value="Urgent" ${feat.priority === 'Urgent' ? 'selected' : ''}>Urgent</option>
+                                <option value="High" ${feat.priority === 'High' ? 'selected' : ''}>High</option>
+                                <option value="Medium" ${feat.priority === 'Medium' ? 'selected' : ''}>Medium</option>
+                                <option value="Low" ${feat.priority === 'Low' ? 'selected' : ''}>Low</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px;">SLA (Hours)</label>
+                            <input type="number" class="form-control ho-feat-sla" value="${feat.sla_hours || 48}" min="4" max="720" onchange="updateFeatureData(${idx}, 'sla_hours', this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Scope & Instructions -->
+                    <div>
+                        <label class="form-label" style="font-size:12px; font-weight:600; margin-bottom:4px;">Deliverable Scope & Technical Instructions (Optional)</label>
+                        <textarea class="form-control ho-feat-notes" rows="2" placeholder="Specific technical requirements, deliverables, or acceptance criteria for this department..." oninput="updateFeatureData(${idx}, 'notes', this.value)">${escapeHtml(feat.notes || '')}</textarea>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        if (window.feather) feather.replace();
+    }
+
+    function addFeatureRow() {
+        syncFeaturesFromDOM();
+        const defaultDept = document.getElementById('ho_primary_department') ? document.getElementById('ho_primary_department').value : 'Development';
+        const targetDept = defaultDept === 'Sales' ? 'Development' : defaultDept;
+        const deptLead = findDepartmentLead(targetDept);
+        const myId = currentLoggedInUser ? parseInt(currentLoggedInUser.id) : 0;
+        handoverFeatures.push({
+            title: '',
+            department: targetDept,
+            team_lead_id: deptLead ? parseInt(deptLead.id) : 0,
+            observers: myId ? [myId] : [],
+            priority: 'High',
+            sla_hours: 48,
+            notes: ''
+        });
+        renderFeatures();
+    }
+
+    function removeFeatureRow(idx) {
+        syncFeaturesFromDOM();
+        if (handoverFeatures.length <= 1) {
+            alert('At least one feature deliverable is required for handover.');
+            return;
+        }
+        handoverFeatures.splice(idx, 1);
+        renderFeatures();
+    }
+
+    function onFeatureDeptChanged(idx, newDept) {
+        syncFeaturesFromDOM();
+        if (!handoverFeatures[idx]) return;
+        handoverFeatures[idx].department = newDept;
+        const newLead = findDepartmentLead(newDept);
+        handoverFeatures[idx].team_lead_id = newLead ? parseInt(newLead.id) : 0;
+        renderFeatures();
+    }
+
+    function updateFeatureData(idx, key, val) {
+        if (handoverFeatures[idx]) {
+            handoverFeatures[idx][key] = val;
+        }
+    }
+
+    function syncFeaturesFromDOM() {
+        const cards = document.querySelectorAll('.ho-feature-card');
+        cards.forEach((card, idx) => {
+            if (handoverFeatures[idx]) {
+                const titleInput = card.querySelector('.ho-feat-title');
+                const deptSelect = card.querySelector('.ho-feat-dept');
+                const leadSelect = card.querySelector('.ho-feat-lead');
+                const prioritySelect = card.querySelector('.ho-feat-priority');
+                const slaInput = card.querySelector('.ho-feat-sla');
+                const notesInput = card.querySelector('.ho-feat-notes');
+
+                if (titleInput) handoverFeatures[idx].title = titleInput.value;
+                if (deptSelect) handoverFeatures[idx].department = deptSelect.value;
+                if (leadSelect) handoverFeatures[idx].team_lead_id = parseInt(leadSelect.value) || 0;
+                if (prioritySelect) handoverFeatures[idx].priority = prioritySelect.value;
+                if (slaInput) handoverFeatures[idx].sla_hours = parseInt(slaInput.value) || 48;
+                if (notesInput) handoverFeatures[idx].notes = notesInput.value;
+            }
+        });
+    }
+
+    async function openHandoverModal() {
         if (!currentSavedDocId) { 
             alert('Please generate and save the document first before submitting handover.'); 
             return; 
         }
+
+        // Load departments and users if not loaded yet
+        try {
+            if (systemDepartments.length === 0) {
+                const resDepts = await fetch('api.php?action=get_departments').then(r => r.json());
+                if (resDepts.success && resDepts.departments) {
+                    systemDepartments = resDepts.departments;
+                }
+            }
+            if (systemUsers.length === 0) {
+                const resUsers = await fetch('api.php?action=get_users').then(r => r.json());
+                if (resUsers.success && resUsers.users) {
+                    systemUsers = resUsers.users.filter(u => parseInt(u.is_active) === 1);
+                }
+            }
+        } catch (e) {
+            console.error("Error loading handover metadata", e);
+        }
+
+        if (systemDepartments.length === 0) {
+            systemDepartments = [
+                { name: 'Development' },
+                { name: 'Creative' },
+                { name: 'Marketing' },
+                { name: 'CRM' },
+                { name: 'Management' },
+                { name: 'Support' }
+            ];
+        }
+
+        // Fetch document details
+        let docData = null;
+        try {
+            const resDoc = await fetch(`api.php?action=get_document_details&id=${currentSavedDocId}`).then(r => r.json());
+            if (resDoc.success && resDoc.document) {
+                docData = resDoc.document;
+                const banner = document.getElementById('ho_client_info_banner');
+                if (banner) {
+                    banner.innerHTML = `<strong>Target Client:</strong> ${escapeHtml(docData.company_name || docData.client_name)} &nbsp;|&nbsp; <strong>Doc:</strong> #${escapeHtml(docData.document_number)} - ${escapeHtml(docData.title)}`;
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching doc details", e);
+        }
+
+        const defaultTitle = docData ? (docData.company_name + ' - ' + docData.title) : (document.getElementById('previewDocTitle').textContent || 'New Project Handover');
+        document.getElementById('ho_project_name').value = defaultTitle;
+
+        const defaultNotes = (docData && docData.custom_fields && docData.custom_fields.CUSTOM_NOTES) 
+            ? docData.custom_fields.CUSTOM_NOTES 
+            : (document.getElementById('customNotes') ? document.getElementById('customNotes').value : '');
+        document.getElementById('ho_description').value = defaultNotes;
+
+        // Initialize features list from custom scope or fallback
+        const scopeText = (docData && docData.custom_fields && docData.custom_fields.CUSTOM_SCOPE) 
+            ? docData.custom_fields.CUSTOM_SCOPE 
+            : (document.getElementById('customScope') ? document.getElementById('customScope').value : '');
         
-        // Dynamically load active Team Leads & Admins into select dropdown
-        fetch('api.php?action=get_users')
-            .then(res => res.json())
-            .then(data => {
-                const leadSelect = document.getElementById('ho_team_lead');
-                if (leadSelect && data.success && data.users) {
-                    let html = '';
-                    const leads = data.users.filter(u => parseInt(u.role_id) === 4 || parseInt(u.role_id) === 1);
-                    if (leads.length > 0) {
-                        leads.forEach(l => {
-                            html += `<option value="${l.id}">${escapeHtml(l.full_name)} (${escapeHtml(l.role_name)})</option>`;
-                        });
-                    } else {
-                        data.users.forEach(l => {
-                            html += `<option value="${l.id}">${escapeHtml(l.full_name)} (${escapeHtml(l.role_name)})</option>`;
-                        });
-                    }
-                    leadSelect.innerHTML = html;
-                }
-            });
+        let parsed = parseScopeIntoFeatures(scopeText);
+        if (parsed.length === 0) {
+            const serviceName = (docData && docData.service_name) ? docData.service_name : (docData ? docData.title : 'Project Deliverables');
+            const dept = guessDepartment(serviceName);
+            const targetDept = dept === 'Sales' ? 'Development' : dept;
+            const lead = findDepartmentLead(targetDept);
+            parsed = [{
+                title: serviceName + ' Execution',
+                department: targetDept,
+                team_lead_id: lead ? parseInt(lead.id) : 0,
+                observers: [],
+                priority: 'High',
+                sla_hours: 48,
+                notes: ''
+            }];
+        }
 
-        fetch(`api.php?action=get_document_details&id=${currentSavedDocId}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.document) {
-                    const banner = document.getElementById('ho_client_info_banner');
-                    if (banner) {
-                        banner.innerHTML = `<strong>Target Client:</strong> ${escapeHtml(data.document.company_name)} &nbsp;|&nbsp; <strong>Doc:</strong> ${escapeHtml(data.document.title)}`;
-                    }
-                }
+        const myId = currentLoggedInUser ? parseInt(currentLoggedInUser.id) : 0;
+        handoverFeatures = [];
+        parsed.forEach(pf => {
+            const dept = (pf.department === 'Sales') ? 'Development' : pf.department;
+            const lead = findDepartmentLead(dept);
+            handoverFeatures.push({
+                title: pf.title,
+                department: dept,
+                team_lead_id: pf.team_lead_id || (lead ? parseInt(lead.id) : 0),
+                observers: myId ? [myId] : [], // Pre-seed sales user as observer
+                priority: pf.priority || 'High',
+                sla_hours: pf.sla_hours || 48,
+                notes: pf.notes || ''
             });
+        });
 
-        document.getElementById('ho_project_name').value = document.getElementById('previewDocTitle').textContent || 'New Project Handover';
+        // Determine primary department based on first feature
+        const primaryDept = handoverFeatures[0] ? handoverFeatures[0].department : 'Development';
+        populatePrimaryDeptDropdown(primaryDept);
+        onPrimaryDeptChange();
+
+        // Render features
+        renderFeatures();
+
         document.getElementById('handoverModal').style.display = 'flex';
+        if (window.feather) feather.replace();
     }
+
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    function openQuickClientModal() {
+        document.getElementById('qc_company_name').value = '';
+        document.getElementById('qc_contact_person').value = '';
+        document.getElementById('qc_email').value = '';
+        document.getElementById('qc_phone').value = '';
+        document.getElementById('qc_service_name').value = '';
+        document.getElementById('qc_price').value = '';
+        document.getElementById('qc_username').value = '';
+        document.getElementById('qc_password').value = '';
+        document.getElementById('quickClientModal').style.display = 'flex';
+        setTimeout(() => document.getElementById('qc_company_name')?.focus(), 50);
+    }
 
     function saveQuickClient() {
         const payload = {
@@ -1555,10 +2022,14 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
                 if (data.client_id) {
                     sessionStorage.setItem('autoSelectClientId', data.client_id);
                 }
+                alert('✅ ' + (data.message || 'Client created successfully.'));
                 location.reload();
             } else {
-                alert('Error: ' + data.message);
+                alert('Error: ' + (data.message || 'Unable to create client.'));
             }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
         });
     }
 
@@ -1568,22 +2039,48 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             return;
         }
 
-        const teamLeadElem = document.getElementById('ho_team_lead');
-        const teamLeadId = teamLeadElem ? teamLeadElem.value : 0;
-        const projectName = document.getElementById('ho_project_name').value.trim();
+        syncFeaturesFromDOM();
 
+        const projectName = document.getElementById('ho_project_name').value.trim();
         if (!projectName) {
             alert('Please enter a valid Project / Work Title.');
             return;
         }
 
+        if (handoverFeatures.length === 0) {
+            alert('Please add at least one feature deliverable for handover.');
+            return;
+        }
+
+        for (let i = 0; i < handoverFeatures.length; i++) {
+            if (!handoverFeatures[i].title || !handoverFeatures[i].title.trim()) {
+                alert(`Please enter a title for Feature #${i + 1}.`);
+                return;
+            }
+        }
+
+        const teamLeadElem = document.getElementById('ho_team_lead');
+        const teamLeadId = teamLeadElem ? (parseInt(teamLeadElem.value) || 0) : 0;
+        const primaryDept = document.getElementById('ho_primary_department') ? document.getElementById('ho_primary_department').value : 'Development';
+
         const payload = {
             document_id: currentSavedDocId,
             project_name: projectName,
+            primary_department: primaryDept,
             team_lead_id: teamLeadId,
             priority: document.getElementById('ho_priority').value,
             deadline: document.getElementById('ho_deadline').value,
-            description: document.getElementById('ho_description').value
+            description: document.getElementById('ho_description').value,
+            features: handoverFeatures.map(f => ({
+                title: f.title,
+                department: f.department,
+                team_lead_id: f.team_lead_id,
+                assigned_to: f.team_lead_id,
+                observers: f.observers || [],
+                priority: f.priority,
+                sla_hours: f.sla_hours,
+                notes: f.notes
+            }))
         };
 
         const submitBtn = document.querySelector('#handoverModal button[type="submit"]');

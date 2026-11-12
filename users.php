@@ -106,13 +106,14 @@ if (empty($departments)) {
                     <th>System Role</th>
                     <th>Department</th>
                     <th>Account Status</th>
+                    <th>Chat Privileges</th>
                     <th>Invite / Signup Token</th>
                     <th>Created Date</th>
                     <th style="text-align:right;">Actions</th>
                 </tr>
             </thead>
             <tbody id="usersTbody">
-                <tr><td colspan="8" style="text-align:center; padding:30px;">Loading user accounts...</td></tr>
+                <tr><td colspan="9" style="text-align:center; padding:30px;">Loading user accounts...</td></tr>
             </tbody>
         </table>
     </div>
@@ -194,6 +195,21 @@ if (empty($departments)) {
                     </div>
                 </div>
 
+                <!-- Chat & Create Group Privileges -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:14px;">
+                    <div style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:8px;">💬 Internal Employee Chat & Group Privileges</div>
+                    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="nu_can_chat" checked style="width:16px; height:16px;" onchange="if(!this.checked){ document.getElementById('nu_can_create_group').checked = false; }">
+                            <span>Allow Employee Chat</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="nu_can_create_group" checked style="width:16px; height:16px;" onchange="if(this.checked){ document.getElementById('nu_can_chat').checked = true; }">
+                            <span>Allow Create Group in Chat Box</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px; font-size:12px; color:#1e40af;">
                     <strong>Module Access Auto-Assignment:</strong> Selecting a role will automatically grant relevant module permissions (e.g. Team Leads get Project & Task Management access; Sales Managers get Client & Proposal access).
                 </div>
@@ -249,6 +265,21 @@ if (empty($departments)) {
                                 <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+                </div>
+
+                <!-- Chat & Create Group Privileges -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-top:4px;">
+                    <div style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:8px;">💬 Internal Employee Chat & Group Privileges</div>
+                    <div style="display:flex; gap:18px; flex-wrap:wrap;">
+                        <label style="display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="eu_can_chat" style="width:16px; height:16px;" onchange="if(!this.checked){ document.getElementById('eu_can_create_group').checked = false; }">
+                            <span>Allow Employee Chat</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; margin:0;">
+                            <input type="checkbox" id="eu_can_create_group" style="width:16px; height:16px;" onchange="if(this.checked){ document.getElementById('eu_can_chat').checked = true; }">
+                            <span>Allow Create Group in Chat Box</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -495,7 +526,7 @@ if (empty($departments)) {
     function renderUsersTable(users) {
         const tbody = document.getElementById('usersTbody');
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#94a3b8;">No users found matching criteria.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">No users found matching criteria.</td></tr>';
             return;
         }
 
@@ -573,6 +604,26 @@ if (empty($departments)) {
                         </span>
                     </td>
                     <td>
+                        ${parseInt(u.role_id) === 7
+                            ? `<span class="badge badge-secondary" style="font-size:11px;">Client (N/A)</span>`
+                            : (() => {
+                                const canChat = parseInt(u.can_chat ?? 1) === 1;
+                                const canGrp = canChat && parseInt(u.can_create_group ?? 1) === 1;
+                                const canToggle = isSuperAdmin || !isTargetSuperAdmin;
+                                return `
+                                    <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+                                        <button type="button" ${canToggle ? '' : 'disabled'} onclick="toggleChatPrivilege(${u.id}, 'chat', ${canChat ? 1 : 0}, ${canGrp ? 1 : 0})" class="btn btn-sm" style="padding:2px 8px; font-size:11px; border-radius:999px; font-weight:700; border:1px solid ${canChat ? '#86efac' : '#fecaca'}; background:${canChat ? '#f0fdf4' : '#fef2f2'}; color:${canChat ? '#166534' : '#991b1b'}; cursor:${canToggle ? 'pointer' : 'not-allowed'};" title="Click to toggle Employee Chat privilege">
+                                            ${canChat ? '💬 Chat: ON' : '🚫 Chat: OFF'}
+                                        </button>
+                                        <button type="button" ${canToggle ? '' : 'disabled'} onclick="toggleChatPrivilege(${u.id}, 'group', ${canChat ? 1 : 0}, ${canGrp ? 1 : 0})" class="btn btn-sm" style="padding:2px 8px; font-size:11px; border-radius:999px; font-weight:700; border:1px solid ${canGrp ? '#bfdbfe' : '#e2e8f0'}; background:${canGrp ? '#eff6ff' : '#f8fafc'}; color:${canGrp ? '#1d4ed8' : '#64748b'}; cursor:${canToggle ? 'pointer' : 'not-allowed'};" title="Click to toggle Create Group privilege in Chat Box">
+                                            ${canGrp ? '👥 Create Group: ON' : '🔒 Group Create: OFF'}
+                                        </button>
+                                    </div>
+                                `;
+                            })()
+                        }
+                    </td>
+                    <td>
                         ${u.signup_token ? '<span class="badge badge-warning">Invite Link Active</span>' : '<span style="color:#64748b; font-size:12px;">Password Set</span>'}
                         <br>${signupLinkBtn}
                     </td>
@@ -625,17 +676,56 @@ if (empty($departments)) {
         if (document.getElementById('eu_department')) {
             document.getElementById('eu_department').value = u.department || 'Development';
         }
+        const canChat = parseInt(u.can_chat ?? 1) === 1;
+        const canGrp = canChat && parseInt(u.can_create_group ?? 1) === 1;
+        if (document.getElementById('eu_can_chat')) {
+            document.getElementById('eu_can_chat').checked = canChat;
+        }
+        if (document.getElementById('eu_can_create_group')) {
+            document.getElementById('eu_can_create_group').checked = canGrp;
+        }
 
         document.getElementById('editUserModal').style.display = 'flex';
     }
 
+    function toggleChatPrivilege(userId, which, currCanChat, currCanGroup) {
+        let nextChat = currCanChat ? 1 : 0;
+        let nextGroup = currCanGroup ? 1 : 0;
+        if (which === 'chat') {
+            nextChat = currCanChat ? 0 : 1;
+            if (!nextChat) nextGroup = 0;
+        } else {
+            nextGroup = currCanGroup ? 0 : 1;
+            if (nextGroup) nextChat = 1;
+        }
+
+        fetch('api.php?action=update_chat_privileges', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, can_chat: nextChat, can_create_group: nextGroup })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                fetchUsersList();
+                if (typeof pollChatUnreadSummary === 'function') pollChatUnreadSummary();
+            } else {
+                alert('Error: ' + (data.message || 'Could not update chat privilege.'));
+            }
+        });
+    }
+
     function submitEditUser() {
+        const canChat = document.getElementById('eu_can_chat')?.checked ? 1 : 0;
+        const canCreateGroup = (canChat && document.getElementById('eu_can_create_group')?.checked) ? 1 : 0;
         const payload = {
             user_id: document.getElementById('eu_user_id').value,
             full_name: document.getElementById('eu_full_name').value,
             email: document.getElementById('eu_email').value,
             role_id: document.getElementById('eu_role_id').value,
-            department: document.getElementById('eu_department').value
+            department: document.getElementById('eu_department').value,
+            can_chat: canChat,
+            can_create_group: canCreateGroup
         };
 
         fetch('api.php?action=update_user', {
@@ -1063,6 +1153,8 @@ if (empty($departments)) {
         document.getElementById('nu_username').value = '';
         document.getElementById('nu_email').value = '';
         document.getElementById('nu_password').value = '';
+        if (document.getElementById('nu_can_chat')) document.getElementById('nu_can_chat').checked = true;
+        if (document.getElementById('nu_can_create_group')) document.getElementById('nu_can_create_group').checked = true;
         document.getElementById('createUserModal').style.display = 'flex';
     }
 
@@ -1073,6 +1165,8 @@ if (empty($departments)) {
             if (m.checked) selectedMode = m.value;
         }
 
+        const canChat = document.getElementById('nu_can_chat')?.checked ? 1 : 0;
+        const canCreateGroup = (canChat && document.getElementById('nu_can_create_group')?.checked) ? 1 : 0;
         const payload = {
             full_name: document.getElementById('nu_full_name').value,
             username: document.getElementById('nu_username').value,
@@ -1080,7 +1174,9 @@ if (empty($departments)) {
             password: document.getElementById('nu_password').value,
             role_id: document.getElementById('nu_role_id').value,
             department: document.getElementById('nu_department').value,
-            set_own_password: (selectedMode === 'user_signup')
+            set_own_password: (selectedMode === 'user_signup'),
+            can_chat: canChat,
+            can_create_group: canCreateGroup
         };
 
         fetch('api.php?action=create_user', {
