@@ -8,13 +8,16 @@ $user = getCurrentUser();
 $db = getDbConnection();
 
 $isLead = isLeadOrAdmin();
+$handledProjectIds = getUserHandledProjectIds($db, $user['id']);
+$isAnyHandler = !empty($handledProjectIds);
+$canManageAnyTasks = $isLead || $isAnyHandler;
 $activeView = (($_GET['view'] ?? '') === 'projects') ? 'projects' : 'tasks';
 
 $pageBreadcrumb = "Module 4";
-$pageTitle = !$isLead ? 'My Assigned Tasks Workspace' : 'Current Projects & Task Hub';
-$pageSubtitle = !$isLead 
+$pageTitle = !$canManageAnyTasks ? 'My Assigned Tasks Workspace' : 'Current Projects & Task Hub';
+$pageSubtitle = !$canManageAnyTasks 
     ? 'Manage your assigned tasks, review current project briefs, and submit completed work.' 
-    : 'Manage current projects, project overview, competitor intelligence, and assign tasks to your team.';
+    : 'Manage current projects, project handlers, sub-tasks, approvals, and client sign-off.';
 require_once __DIR__ . '/header.php';
 
 // Fetch active internal staff (exclude Client accounts) for task & lead assignment
@@ -245,7 +248,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             </select>
         </div>
 
-        <?php if ($isLead): ?>
+        <?php if ($canManageAnyTasks): ?>
             <div style="flex:1; min-width:160px;">
                 <select id="filterDeveloper" class="form-select" onchange="loadTasks()">
                     <option value="0">All Developers</option>
@@ -263,6 +266,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
 </div>
 
 <?php if ($selectedProjectId > 0): ?>
+    <?php $canManageSelectedProject = $isLead || in_array($selectedProjectId, $handledProjectIds); ?>
     <!-- Handover Project Loaded Highlight Banner for Team Lead -->
     <div class="card" style="background:#eff6ff; border:1px solid #bfdbfe; padding:14px 18px; margin-bottom:20px; border-radius:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <div style="display:flex; align-items:center; gap:12px;">
@@ -270,14 +274,18 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             <div>
                 <strong style="font-size:14px; color:#1e40af;">Project Handover Workspace Loaded</strong>
                 <p style="font-size:12px; color:#3b82f6; margin:2px 0 0 0;">
-                    Viewing deliverables for Project #<?= $selectedProjectId ?>. Leads can view full overview/competitors or create tasks directly on this project.
+                    Viewing deliverables for Project #<?= $selectedProjectId ?>. Leads & Project Handlers can create tasks/sub-tasks or review approvals.
                 </p>
             </div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
             <a href="project_details.php?id=<?= $selectedProjectId ?>" class="btn btn-primary btn-sm">📊 Overview & Competitors</a>
             <?php if ($isLead): ?>
+                <button type="button" class="btn btn-outline btn-sm" style="background:#fff; color:#0f766e; border-color:#99f6e4; font-weight:700;" onclick="openAssignProjectHandlersById(<?= $selectedProjectId ?>)">🛡️ Assign Project Handler</button>
+            <?php endif; ?>
+            <?php if ($canManageSelectedProject): ?>
                 <button type="button" class="btn btn-outline btn-sm" style="background:#fff; color:#1d4ed8; border-color:#93c5fd;" onclick="openCreateProjectTask(<?= $selectedProjectId ?>)">+ Create Task on Project</button>
+                <button type="button" class="btn btn-outline btn-sm" style="background:#fff; color:#7c3aed; border-color:#ddd6fe;" onclick="openCreateProjectTask(<?= $selectedProjectId ?>, '', 0, true)">↳ + Create Sub-Task</button>
             <?php endif; ?>
             <a href="projects.php?view=projects" class="btn btn-outline btn-sm" style="color:#2563eb; border-color:#93c5fd; background:#ffffff;">Current Projects List</a>
         </div>
@@ -285,7 +293,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
 <?php endif; ?>
 
 <!-- DEVELOPER KANBAN BOARD / TEAM LEAD TASK TABLE -->
-<?php if (!$isLead): ?>
+<?php if (!$canManageAnyTasks): ?>
 
     <!-- Developer Column Workflow Layout -->
     <div class="grid-4" style="align-items:start;">
@@ -439,6 +447,16 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                     </label>
                 </div>
 
+                <div class="form-group" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <label class="form-label" style="margin:0; font-size:12.5px; color:#0f172a; font-weight:700;">
+                            🛡️ Project Handlers (Multiple Allowed — Can Assign Tasks, Create Sub-Tasks & Approve Work)
+                        </label>
+                        <span id="cp_handlers_badge" class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:10.5px;">0 Selected</span>
+                    </div>
+                    <div id="cp_handlers_pills" style="display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow-y:auto;"></div>
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">About the Project (Vision, Background & Brand Goals)</label>
                     <textarea id="cp_about_project" class="form-control" rows="3" placeholder="Explain what this project is about, brand voice, core objectives, and business background..."></textarea>
@@ -580,12 +598,26 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             <div class="modal-body">
                 <div class="form-group">
                     <label class="form-label">Project *</label>
-                    <select id="ct_project_id" class="form-select" required>
+                    <select id="ct_project_id" class="form-select" required onchange="loadCreateModalParentTasks()">
                         <option value="">-- Choose Project --</option>
                         <?php foreach ($projects as $p): ?>
+                            <?php if (!$isLead && !in_array(intval($p['id']), $handledProjectIds, true)) continue; ?>
                             <option value="<?= $p['id'] ?>" <?= ($p['id'] == $selectedProjectId) ? 'selected' : '' ?>><?= htmlspecialchars($p['project_name']) ?> (<?= htmlspecialchars($p['company_name']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+
+                <div class="form-group" style="background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                        <input type="checkbox" id="ct_is_subtask" onchange="toggleCreateSubtaskFields()" style="width:16px; height:16px; cursor:pointer;">
+                        <label for="ct_is_subtask" style="margin:0; font-size:12.5px; font-weight:700; color:#5b21b6; cursor:pointer;">↳ Create as Project Sub-Task (optional parent task link)</label>
+                    </div>
+                    <div id="ct_parent_task_wrap" style="display:none; margin-top:6px;">
+                        <label class="form-label" style="font-size:11.5px; color:#5b21b6;">Parent Task (optional)</label>
+                        <select id="ct_parent_task_id" class="form-select" style="font-size:12.5px;">
+                            <option value="0">-- Standalone Project Sub-Task --</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -715,6 +747,11 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                     <label class="form-label">Attachment / Deliverable / Pull Request URL</label>
                     <input type="url" id="sw_attachment_url" class="form-control" placeholder="https://github.com/agency/repo/pull/42 or live URL">
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label">Attach Media / Screenshots / Files (Optional)</label>
+                    <input type="file" id="sw_media_files" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.mp4,.mov,.webm,.mp3" class="form-control" style="padding:6px; font-size:12.5px;">
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('submitWorkModal')">Cancel</button>
@@ -745,9 +782,9 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 <div class="form-group">
                     <label class="form-label">Review Action *</label>
                     <select id="rw_action" class="form-select" onchange="onReviewActionChanged()" required>
-                        <option value="APPROVE">APPROVE (Mark Completed / Pass Internal Review)</option>
-                        <option value="REQUEST_REVISION">REQUEST REVISION (Send Back to Developer with Changes Needed)</option>
-                        <option value="SEND_CLIENT_APPROVAL">SEND FOR CLIENT APPROVAL (Send to Client)</option>
+                        <option value="APPROVE">APPROVE (Handler Approved &rarr; Send for Client Approval)</option>
+                        <option value="REQUEST_REVISION">REQUEST REVISION (Send Back to Employee with Changes Needed)</option>
+                        <option value="SEND_CLIENT_APPROVAL">SEND DIRECTLY FOR CLIENT APPROVAL</option>
                     </select>
                 </div>
 
@@ -781,12 +818,30 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         <form onsubmit="event.preventDefault(); submitReassignTask();">
             <div class="modal-body">
                 <input type="hidden" id="rt_task_id" value="0">
+                <input type="hidden" id="rt_project_id" value="0">
                 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:14px;">
                     <div style="font-size:13px; color:#1e293b; font-weight:700;" id="rt_task_title">Task Title</div>
-                    <div style="display:flex; gap:6px; align-items:center; margin-top:4px;">
+                    <div style="display:flex; gap:6px; align-items:center; margin-top:4px; flex-wrap:wrap;">
                         <span id="rt_task_dept_badge" class="badge" style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; font-size:11px;"></span>
+                        <span id="rt_task_proj_badge" class="badge" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-size:11px;"></span>
                     </div>
                 </div>
+
+                <?php if ($isLead): ?>
+                <!-- Lead Only: Separate Project Handler Selector for the Particular Project -->
+                <div class="form-group" style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:8px; padding:14px; margin-bottom:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label class="form-label" style="font-size:12px; font-weight:700; color:#0f766e; margin:0; display:flex; align-items:center; gap:6px;">
+                            <span>🛡️ Project Handler for This Project (Lead Access Only)</span>
+                            <span id="rt_handlers_count_badge" class="badge" style="background:#ccfbf1; color:#0f766e; font-size:10px; font-weight:700;">0 Selected</span>
+                        </label>
+                    </div>
+                    <p style="font-size:11px; color:#115e59; margin:0 0 8px 0;">
+                        Assigned separately from task employees. Selected Project Handlers can create sub-tasks for employees and must approve completed tasks.
+                    </p>
+                    <div id="rt_handlers_pills_container" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                </div>
+                <?php endif; ?>
 
                 <div class="form-group">
                     <label class="form-label" style="font-weight:600;">Primary Assigned Developer *</label>
@@ -842,16 +897,56 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
     </div>
 </div>
 
+<?php if ($isLead): ?>
+<!-- MODAL 5: ASSIGN PROJECT HANDLER SEPARATELY (Lead Access Only) -->
+<div id="assignProjectHandlersModal" class="modal-overlay" style="display:none; z-index:9999;">
+    <div class="modal-content" style="max-width:600px; width:95%; max-height:90vh; overflow-y:auto;">
+        <div class="modal-header">
+            <div>
+                <h3 class="modal-title" style="margin:0;">🛡️ Select & Assign Project Handlers</h3>
+                <small style="color:#0f766e; font-weight:600;" id="aph_project_subtitle">Lead Access Only — Separate Project Authority</small>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="closeModal('assignProjectHandlersModal')">&times;</button>
+        </div>
+        <form onsubmit="event.preventDefault(); submitAssignProjectHandlers();">
+            <div class="modal-body">
+                <input type="hidden" id="aph_project_id" value="0">
+                <div style="background:#f0fdfa; border:1px solid #99f6e4; border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:12.5px; color:#115e59;">
+                    Select the <strong>Project Handler(s)</strong> for <strong id="aph_project_name">this project</strong>. Only Team Leads and Admins can add Project Handlers. Assigned handlers can create sub-tasks for employees and hold approval control before task completion.
+                </div>
+                <div class="form-group" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <label class="form-label" style="margin:0; font-size:12.5px; font-weight:700;">Choose Project Handlers (Multiple Allowed)</label>
+                        <span id="aph_handlers_badge" class="badge" style="background:#ccfbf1; color:#0f766e; font-size:11px; font-weight:700;">0 Selected</span>
+                    </div>
+                    <div id="aph_handlers_pills" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('assignProjectHandlersModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background:#0f766e; border-color:#0f766e; font-weight:700;">Save Project Handlers</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
     const userRole = <?= json_encode($user['role']) ?>;
     const isLeadOrAdminUser = <?= json_encode($isLead) ?>;
-    const canCreateTasksUser = <?= json_encode($isLead) ?>;
+    const canManageAnyTasksUser = <?= json_encode($canManageAnyTasks) ?>;
+    const handledProjectIdsUser = <?= json_encode(array_values($handledProjectIds)) ?>;
+    const canCreateTasksUser = <?= json_encode($canManageAnyTasks) ?>;
     const currentUserId = <?= intval($user['id']) ?>;
     const currentUserDept = <?= json_encode($user['department'] ?? 'Development') ?>;
     let currentWorkspaceView = <?= json_encode($activeView) ?>;
     let projSearchTimer = null;
 
     const allStaffUsers = <?= json_encode($developers) ?>;
+    let projectModalHandlers = [];
+    let reassignProjectHandlers = [];
+    let aphProjectId = 0;
+    let aphSelectedHandlers = [];
     let reassignSelectedMembers = [];
     let reassignSelectedObservers = [];
     let reassignCurrentDept = '';
@@ -942,7 +1037,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                     <h4 style="margin:0 0 6px 0; color:#0f172a;">No projects match the current filter</h4>
                     <p style="font-size:13px; color:#64748b; margin:0 0 16px 0;">Add or import current projects with overview details, competitors, and deliverables.</p>
                     <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                        ${(isLeadOrAdminUser || canCreateTasksUser) ? `<button type="button" class="btn btn-primary" onclick="openCreateProjectModal()">+ Add Current Project</button>` : ''}
+                        ${isLeadOrAdminUser ? `<button type="button" class="btn btn-primary" onclick="openCreateProjectModal()">+ Add Current Project</button>` : ''}
                         ${isLeadOrAdminUser ? `<button type="button" class="btn btn-outline" onclick="openImportProjectsModal()">📥 Import Projects CSV</button>` : ''}
                     </div>
                 </div>
@@ -990,10 +1085,32 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                             ${escapeHtml(p.project_name)}
                         </a>
 
-                        <div style="font-size:12.5px; color:#475569; margin-bottom:10px; display:flex; flex-wrap:wrap; gap:10px;">
+                        <div style="font-size:12.5px; color:#475569; margin-bottom:8px; display:flex; flex-wrap:wrap; gap:10px;">
                             <span>🏢 <strong>${escapeHtml(p.company_name || 'N/A')}</strong></span>
                             <span>👤 Lead: <strong>${escapeHtml(p.team_lead_name || 'Unassigned')}</strong></span>
+                            ${parseInt(p.client_approved || 0) === 1 ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10.5px;">☑ Client Approved</span>` : ''}
                         </div>
+
+                        ${(p.handlers && p.handlers.length) ? `
+                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; align-items:center;">
+                                <span style="font-size:11px; color:#64748b; font-weight:700;">🛡️ Handlers:</span>
+                                ${p.handlers.map(h => `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10.5px;">${escapeHtml(h.full_name)}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                        ${(p.working_employees && p.working_employees.length) ? `
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; align-items:center;">
+                                <span style="font-size:11px; color:#1d4ed8; font-weight:700;">👥 Working (${p.working_employees.length}):</span>
+                                ${p.working_employees.slice(0, 5).map(w => `<span class="badge" style="background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; font-size:10px;">${escapeHtml(w.full_name)}</span>`).join('')}
+                                ${p.working_employees.length > 5 ? `<span class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:10px;">+${p.working_employees.length - 5} more</span>` : ''}
+                            </div>
+                        ` : ''}
+                        ${(p.observers && p.observers.length) ? `
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; align-items:center;">
+                                <span style="font-size:10.5px; color:#6b21a8; font-weight:700;">👁️ Observers (${p.observers.length}):</span>
+                                ${p.observers.slice(0, 4).map(o => `<span class="badge" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; font-size:10px;">${escapeHtml(o.full_name)} (${escapeHtml(o.role_name || '')})</span>`).join('')}
+                                ${p.observers.length > 4 ? `<span class="badge" style="background:#f3e8ff; color:#6b21a8; font-size:10px;">+${p.observers.length - 4} more</span>` : ''}
+                            </div>
+                        ` : ''}
 
                         <p style="font-size:12.5px; color:#334155; line-height:1.5; margin:0 0 12px 0;">
                             ${safeSnippet}
@@ -1029,12 +1146,18 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                         <a href="project_details.php?id=${p.id}" class="btn btn-primary btn-sm" style="flex:1; text-align:center; justify-content:center;">
                             📊 Overview & Competitors
                         </a>
-                        ${canCreateTasksUser ? `
+                        ${(p.can_manage_project || isLeadOrAdminUser) ? `
                             <button type="button" class="btn btn-outline btn-sm" style="color:#15803d; border-color:#86efac; background:#f0fdf4; font-weight:700;" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")})'>
-                                + Create Task
+                                + Task
+                            </button>
+                            <button type="button" class="btn btn-outline btn-sm" style="color:#7c3aed; border-color:#ddd6fe; background:#f5f3ff; font-weight:700;" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")}, 0, true)'>
+                                + Sub-Task
                             </button>
                         ` : ''}
                         ${isLeadOrAdminUser ? `
+                            <button type="button" class="btn btn-outline btn-sm" style="color:#0f766e; border-color:#99f6e4; background:#f0fdfa; font-weight:700;" onclick='openAssignProjectHandlersModal(${p.id}, ${JSON.stringify(p.project_name || "")}, ${JSON.stringify(p.handler_ids || [])})' title="Select & Assign Project Handlers separately (Lead Only)">
+                                🛡️ Handlers
+                            </button>
                             <button type="button" class="btn btn-outline btn-sm" onclick="openEditProjectModal(${p.id})" title="Edit Project Overview & Details">
                                 ✏️ Edit
                             </button>
@@ -1057,7 +1180,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         loadTasks();
     }
 
-    function openCreateProjectTask(projectId, departmentName = '') {
+    function openCreateProjectTask(projectId, departmentName = '', parentTaskId = 0, forceSubtask = false) {
         const fp = document.getElementById('filterProject');
         if (fp) fp.value = String(projectId);
         const projSelect = document.getElementById('ct_project_id');
@@ -1073,7 +1196,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 }
             }
         }
-        openCreateTaskModal();
+        openCreateTaskModal(parentTaskId, forceSubtask);
     }
 
     function loadMetrics() {
@@ -1170,7 +1293,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 if (!data.success) return;
                 const tasks = data.tasks;
 
-                if (!isLeadOrAdminUser) {
+                if (!canManageAnyTasksUser) {
                     renderDeveloperKanban(tasks);
                 } else {
                     renderTeamLeadTable(tasks);
@@ -1219,10 +1342,35 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 loadTasks();
             } else {
                 alert('Error: ' + data.message);
+                loadTasks();
             }
         })
         .catch(err => {
             alert('Failed to update task status.');
+            loadTasks();
+        });
+    }
+
+    function toggleTaskClientApprovalInList(taskId, approved) {
+        fetch('api.php?action=toggle_task_client_approval', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, approved: approved ? 1 : 0 })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                loadMetrics();
+                loadTasks();
+                loadCurrentProjects();
+            } else {
+                alert('Error: ' + (data.message || 'Could not update client approval'));
+                loadTasks();
+            }
+        })
+        .catch(() => {
+            alert('Network error updating client approval.');
+            loadTasks();
         });
     }
 
@@ -1252,9 +1400,12 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                     const safeTitle = (t.title || '').replace(/'/g, "\\'");
                     html += `
                         <div style="background:white; border:1px solid #e2e8f0; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
                                 <strong style="font-size:12px; color:#2563eb;">${t.task_code}</strong>
-                                <span class="badge ${slaClass}" style="font-size:10px;">${t.sla_status}</span>
+                                <div style="display:flex; gap:4px; align-items:center;">
+                                    ${(t.is_subtask || t.task_type === 'subtask') ? `<span class="badge" style="background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; font-size:9.5px;">SUB-TASK</span>` : ''}
+                                    <span class="badge ${slaClass}" style="font-size:10px;">${t.sla_status}</span>
+                                </div>
                             </div>
                             <h5 style="margin:8px 0; font-size:14px; color:#0f172a; font-weight:600;">${escapeHtml(t.title)}</h5>
                             <p style="font-size:12px; color:#64748b; margin-bottom:12px;">Project: ${escapeHtml(t.project_name)}${t.department ? ` &bull; <span style="color:#2563eb; font-weight:600;">📁 ${escapeHtml(t.department)}</span>` : ''}</p>
@@ -1264,8 +1415,8 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                                 ${t.status === 'PENDING' ? `
                                     <button class="btn btn-outline btn-sm" style="font-size:11px; color:#0284c7; border-color:#93c5fd;" onclick="updateTaskStatusDirect(${t.id}, 'IN PROGRESS')">⚡ Start</button>
                                 ` : ''}
-                                ${t.status === 'IN PROGRESS' || t.status === 'REVISION REQUIRED' ? `
-                                    <button class="btn btn-success btn-sm" style="font-size:11px;" onclick="openSubmitWorkModal(${t.id}, '${safeTitle}')">Submit Work</button>
+                                ${t.status === 'IN PROGRESS' || t.status === 'REVISION REQUIRED' || t.status === 'CLIENT REVISION REQUESTED' ? `
+                                    <button class="btn btn-success btn-sm" style="font-size:11px;" onclick="openSubmitWorkModal(${t.id}, '${safeTitle}')">📤 Submit for Approval</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -1287,16 +1438,27 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         tasks.forEach(t => {
             const slaClass = t.sla_status === 'SLA Breached' ? 'badge-danger' : (t.sla_status === 'Near SLA Warning' ? 'badge-warning' : 'badge-primary');
             const safeTitle = escapeHtml(t.title);
+            const canManageRow = Boolean(t.can_manage_task || isLeadOrAdminUser);
+            const isSub = Boolean(t.is_subtask || t.task_type === 'subtask' || parseInt(t.parent_task_id || 0) > 0);
+            const isHandlerApproved = parseInt(t.handler_approved || 0) === 1 || ['PENDING LEAD APPROVAL', 'LEAD APPROVED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED'].includes(t.status);
+            const isLeadApproved = parseInt(t.lead_approved || 0) === 1 || ['LEAD APPROVED', 'COMPLETED'].includes(t.status) || (t.status === 'SENT FOR CLIENT APPROVAL' && parseInt(t.lead_approved || 0) === 1);
+            const isClientTicked = parseInt(t.client_approved_by_handler || 0) === 1 || t.status === 'COMPLETED';
 
             html += `
-                <tr>
-                    <td><strong style="color:#2563eb;">${t.task_code}</strong></td>
+                <tr style="${isSub ? 'background:#faf5ff;' : ''}">
+                    <td><strong style="color:${isSub ? '#7c3aed' : '#2563eb'};">${t.task_code}</strong></td>
                     <td>
+                        ${isSub ? `<span class="badge" style="background:#ede9fe; color:#6d28d9; font-size:9.5px; margin-right:4px;">↳ SUB-TASK</span>` : ''}
                         <a href="task_details.php?id=${t.id}" style="font-weight:700; color:#0f172a; text-decoration:none;">${safeTitle}</a>
+                        ${t.parent_task_code ? `<br><small style="color:#6d28d9; font-size:10.5px;">Parent: #${escapeHtml(t.parent_task_code)} (${escapeHtml(t.parent_task_title || '')})</small>` : ''}
+                        ${isHandlerApproved && t.status === 'SENT FOR CLIENT APPROVAL' ? `<br><span style="font-size:10.5px; color:#15803d; font-weight:700;">✓ Handler Approved &bull; Awaiting Client Tick</span>` : ''}
+                        ${(isHandlerApproved && !isLeadApproved && t.status !== 'COMPLETED') ? `<br><span style="font-size:10.5px; color:#d97706; font-weight:700;">⏳ Handler Approved &bull; Pending Lead Approval</span>` : ''}
+                        ${(isLeadApproved && t.status === 'SENT FOR CLIENT APPROVAL') ? `<br><span style="font-size:10.5px; color:#15803d; font-weight:700;">✓ Lead Approved &bull; Ready for Client Tick</span>` : ''}
                     </td>
                     <td>
                         <a href="project_details.php?id=${t.project_id}" style="color:#1e40af; font-weight:700; text-decoration:none;" title="Open Project Overview & Competitors">${escapeHtml(t.project_name)}</a><br>
                         <small style="color:var(--text-muted);">${escapeHtml(t.company_name)}</small>
+                        ${(t.project_handlers && t.project_handlers.length) ? `<div style="margin-top:3px; display:flex; flex-wrap:wrap; gap:3px;">${t.project_handlers.map(h => `<span class="badge" style="background:#ccfbf1; color:#0f766e; font-size:9.5px; padding:1px 6px;">🛡️ ${escapeHtml(h.full_name)}</span>`).join('')}</div>` : ''}
                     </td>
                     <td>
                         <span class="badge badge-secondary">${escapeHtml(t.assigned_to_name || 'Unassigned')}</span>
@@ -1306,25 +1468,55 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                     </td>
                     <td><span class="badge ${t.priority === 'Urgent' ? 'badge-danger' : 'badge-warning'}">${t.priority}</span></td>
                     <td>
-                        <select class="form-select" style="font-size:12px; font-weight:700; padding:4px 8px; width:135px; border-radius:6px; cursor:pointer;" onchange="updateTaskStatusDirect(${t.id}, this.value)">
+                        <select class="form-select" style="font-size:12px; font-weight:700; padding:4px 8px; width:175px; border-radius:6px; cursor:pointer;" onchange="updateTaskStatusDirect(${t.id}, this.value)">
                             <option value="PENDING" ${t.status === 'PENDING' ? 'selected' : ''}>⏳ Pending</option>
                             <option value="IN PROGRESS" ${t.status === 'IN PROGRESS' ? 'selected' : ''}>⚡ In Progress</option>
                             <option value="UNDER REVIEW" ${t.status === 'UNDER REVIEW' ? 'selected' : ''}>🔍 Under Review</option>
-                            <option value="REVISION REQUIRED" ${t.status === 'REVISION REQUIRED' ? 'selected' : ''}>🔄 Revision Needed</option>
-                            <option value="COMPLETED" ${t.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
+                            ${canManageRow ? `
+                                <option value="PENDING LEAD APPROVAL" ${t.status === 'PENDING LEAD APPROVAL' ? 'selected' : ''}>📝 Pending Lead Approval</option>
+                                <option value="REVISION REQUIRED" ${t.status === 'REVISION REQUIRED' ? 'selected' : ''}>🔄 Revision Needed</option>
+                                <option value="SENT FOR CLIENT APPROVAL" ${t.status === 'SENT FOR CLIENT APPROVAL' ? 'selected' : ''}>📩 Client Approval</option>
+                                <option value="COMPLETED" ${t.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
+                            ` : (['PENDING LEAD APPROVAL', 'SENT FOR CLIENT APPROVAL', 'COMPLETED', 'REVISION REQUIRED'].includes(t.status) ? `<option value="${escapeHtml(t.status)}" selected>${escapeHtml(t.status)}</option>` : '')}
                         </select>
+                        ${(canManageRow && (isLeadApproved || (isLeadOrAdminUser && isHandlerApproved))) ? `
+                            <label style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; font-weight:700; color:${isClientTicked ? '#15803d' : '#1d4ed8'}; cursor:pointer;">
+                                <input type="checkbox" ${isClientTicked ? 'checked' : ''} onchange="toggleTaskClientApprovalInList(${t.id}, this.checked)" style="width:14px; height:14px; cursor:pointer;">
+                                Approved by Client
+                            </label>
+                        ` : ((canManageRow && isHandlerApproved && !isLeadApproved) ? `<div style="margin-top:4px; font-size:10.5px; color:#d97706; font-weight:700;">⏳ Needs Lead Approval</div>` : '')}
                     </td>
                     <td><span class="badge ${slaClass}">${t.sla_status}</span></td>
                     <td><small style="color:#475569;">${t.deadline ? t.deadline.substring(0, 16) : 'N/A'}</small></td>
                     <td>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
                             <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm" title="View details & discussion">Details</a>
-                            <button class="btn btn-outline btn-sm" onclick="openReassignModal(${t.id}, '${safeTitle.replace(/'/g, "\\'")}', ${t.assigned_to || 0}, '${escapeHtml(t.department || '')}', ${JSON.stringify(t.assignee_ids || [])}, ${JSON.stringify(t.observer_ids || [])})" style="color:#2563eb; border-color:#93c5fd;" title="Assign team members and observers">
-                                👤 Assign
-                            </button>
-                            ${t.status === 'UNDER REVIEW' ? `
-                                <button class="btn btn-primary btn-sm" onclick="openReviewModal(${t.id}, '${t.task_code}', '${(t.remarks || '').replace(/'/g, "\\'")}')">Review</button>
-                            ` : ''}
+                            <a href="task_details.php?id=${t.id}" class="btn btn-outline btn-sm" title="View details, media & discussion">Details / Media</a>
+                            ${canManageRow ? `
+                                ${isLeadOrAdminUser ? `
+                                    <button class="btn btn-outline btn-sm" onclick='openAssignProjectHandlersModal(${t.project_id}, ${JSON.stringify(t.project_name || "")}, ${JSON.stringify(t.project_handler_ids || [])})' style="color:#0f766e; border-color:#99f6e4;" title="Select Project Handler separately (Lead Only)">
+                                        🛡️ Handler
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-outline btn-sm" onclick='openReassignModal(${t.id}, ${JSON.stringify(t.title || "")}, ${t.assigned_to || 0}, ${JSON.stringify(t.department || "")}, ${JSON.stringify(t.assignee_ids || [])}, ${JSON.stringify(t.observer_ids || [])}, ${t.project_id || 0}, ${JSON.stringify(t.project_name || "")}, ${JSON.stringify(t.project_handler_ids || [])})' style="color:#2563eb; border-color:#93c5fd;" title="Assign team members, project handler and observers">
+                                    👤 Assign
+                                </button>
+                                ${!isSub ? `
+                                    <button class="btn btn-outline btn-sm" onclick='openCreateProjectTask(${t.project_id}, ${JSON.stringify(t.department || "")}, ${t.id}, true)' style="color:#7c3aed; border-color:#ddd6fe;" title="Create Sub-Task under this Task">
+                                        ↳ Sub-Task
+                                    </button>
+                                ` : ''}
+                                ${t.status === 'UNDER REVIEW' ? `
+                                    <button class="btn btn-primary btn-sm" onclick="openReviewModal(${t.id}, '${t.task_code}', '${(t.remarks || '').replace(/'/g, "\\'")}')">✓ Approve / Review</button>
+                                ` : ''}
+                                ${(isLeadOrAdminUser && t.status === 'PENDING LEAD APPROVAL') ? `
+                                    <button class="btn btn-success btn-sm" onclick="leadApproveTaskInList(${t.id})" style="background:#15803d; border-color:#15803d;">🛡️ Lead Approve</button>
+                                ` : ''}
+                            ` : `
+                                ${(t.status === 'IN PROGRESS' || t.status === 'REVISION REQUIRED' || t.status === 'CLIENT REVISION REQUESTED') ? `
+                                    <button class="btn btn-success btn-sm" onclick="openSubmitWorkModal(${t.id}, '${safeTitle.replace(/'/g, "\\'")}')">📤 Submit Work</button>
+                                ` : ''}
+                            `}
                         </div>
                     </td>
                 </tr>
@@ -1334,14 +1526,21 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         if (window.feather) feather.replace();
     }
 
-    function openReassignModal(taskId, title, currentAssignee, dept = '', existingAssignees = [], existingObservers = []) {
+    function openReassignModal(taskId, title, currentAssignee, dept = '', existingAssignees = [], existingObservers = [], projectId = 0, projectName = '', existingProjHandlers = []) {
         document.getElementById('rt_task_id').value = taskId;
+        const rtProjEl = document.getElementById('rt_project_id');
+        if (rtProjEl) rtProjEl.value = projectId || 0;
         document.getElementById('rt_task_title').textContent = title;
         reassignCurrentDept = dept || '';
 
         const deptBadge = document.getElementById('rt_task_dept_badge');
         if (deptBadge) {
             deptBadge.textContent = dept ? `📁 Department: ${dept}` : '📁 General';
+        }
+        const projBadge = document.getElementById('rt_task_proj_badge');
+        if (projBadge) {
+            projBadge.textContent = projectName ? `📌 Project: ${projectName}` : '';
+            projBadge.style.display = projectName ? 'inline-flex' : 'none';
         }
 
         const assignSelect = document.getElementById('rt_assigned_to');
@@ -1367,9 +1566,117 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             reassignSelectedObservers = [];
         }
 
+        reassignProjectHandlers = Array.isArray(existingProjHandlers) ? existingProjHandlers.map(x => parseInt(x)).filter(x => x > 0) : [];
+        if (isLeadOrAdminUser) {
+            renderReassignHandlerPills();
+        }
+
         renderReassignPills();
         renderReassignObserverPills();
         document.getElementById('reassignTaskModal').style.display = 'flex';
+    }
+
+    function toggleReassignProjectHandler(uid) {
+        const id = parseInt(uid);
+        const idx = reassignProjectHandlers.indexOf(id);
+        if (idx > -1) reassignProjectHandlers.splice(idx, 1);
+        else reassignProjectHandlers.push(id);
+        renderReassignHandlerPills();
+    }
+
+    function renderReassignHandlerPills() {
+        const container = document.getElementById('rt_handlers_pills_container');
+        const badge = document.getElementById('rt_handlers_count_badge');
+        if (!container) return;
+        if (badge) badge.textContent = `${reassignProjectHandlers.length} Selected`;
+
+        let html = '';
+        allStaffUsers.forEach(u => {
+            const uid = parseInt(u.id);
+            const isSel = reassignProjectHandlers.includes(uid);
+            html += `
+                <button type="button" onclick="toggleReassignProjectHandler(${uid})"
+                    style="background:${isSel ? '#0f766e' : '#ffffff'}; color:${isSel ? '#ffffff' : '#334155'}; border:1px solid ${isSel ? '#0d9488' : '#99f6e4'}; font-size:11.5px; padding:4px 10px; border-radius:16px; font-weight:600; display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                    <span>${isSel ? '✓' : '+'} ${escapeHtml(u.full_name)}</span>
+                    <small style="opacity:0.8; font-size:10px;">(${escapeHtml(u.role_name || u.department)})</small>
+                </button>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function openAssignProjectHandlersById(projectId) {
+        fetch('api.php?action=get_project_details&project_id=' + encodeURIComponent(projectId))
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.project) {
+                    alert(data.message || 'Could not load project details.');
+                    return;
+                }
+                openAssignProjectHandlersModal(projectId, data.project.project_name || '', data.project.handler_ids || []);
+            })
+            .catch(() => alert('Network error loading project handlers.'));
+    }
+
+    function openAssignProjectHandlersModal(projectId, projectName = '', existingHandlers = []) {
+        if (!isLeadOrAdminUser) return;
+        aphProjectId = parseInt(projectId) || 0;
+        document.getElementById('aph_project_id').value = aphProjectId;
+        document.getElementById('aph_project_name').textContent = projectName || `Project #${aphProjectId}`;
+        document.getElementById('aph_project_subtitle').textContent = `Project #${aphProjectId} • Lead Access Only`;
+        aphSelectedHandlers = Array.isArray(existingHandlers) ? existingHandlers.map(x => parseInt(x)).filter(x => x > 0) : [];
+        renderAssignProjectHandlersPills();
+        document.getElementById('assignProjectHandlersModal').style.display = 'flex';
+    }
+
+    function toggleAphHandler(uid) {
+        const id = parseInt(uid);
+        const idx = aphSelectedHandlers.indexOf(id);
+        if (idx > -1) aphSelectedHandlers.splice(idx, 1);
+        else aphSelectedHandlers.push(id);
+        renderAssignProjectHandlersPills();
+    }
+
+    function renderAssignProjectHandlersPills() {
+        const container = document.getElementById('aph_handlers_pills');
+        const badge = document.getElementById('aph_handlers_badge');
+        if (!container) return;
+        if (badge) badge.textContent = `${aphSelectedHandlers.length} Selected`;
+
+        container.innerHTML = allStaffUsers.map(u => {
+            const uid = parseInt(u.id);
+            const sel = aphSelectedHandlers.includes(uid);
+            return `
+                <button type="button" onclick="toggleAphHandler(${uid})"
+                    style="background:${sel ? '#0f766e' : '#ffffff'}; color:${sel ? '#ffffff' : '#334155'}; border:1px solid ${sel ? '#0d9488' : '#cbd5e1'}; font-size:11.5px; padding:4px 10px; border-radius:16px; font-weight:600; display:inline-flex; align-items:center; gap:5px; cursor:pointer;">
+                    <span>${sel ? '✓' : '+'} ${escapeHtml(u.full_name)}</span>
+                    <small style="opacity:0.8; font-size:10px;">(${escapeHtml(u.role_name || u.department)})</small>
+                </button>
+            `;
+        }).join('');
+    }
+
+    function submitAssignProjectHandlers() {
+        fetch('api.php?action=assign_project_handlers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: aphProjectId,
+                handlers: aphSelectedHandlers
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                closeModal('assignProjectHandlersModal');
+                alert('🛡️ ' + data.message);
+                loadCurrentProjects();
+                loadTasks();
+            } else {
+                alert('Error: ' + (data.message || 'Could not update project handlers.'));
+            }
+        })
+        .catch(() => alert('Network error saving project handlers.'));
     }
 
     function addReassignObserver(userId) {
@@ -1502,15 +1809,20 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             return;
         }
 
+        const payloadReassign = { 
+            task_id: taskId, 
+            assigned_to: assignedTo,
+            assignees: reassignSelectedMembers,
+            observers: reassignSelectedObservers
+        };
+        if (isLeadOrAdminUser) {
+            payloadReassign.project_handlers = reassignProjectHandlers;
+        }
+
         fetch('api.php?action=reassign_task', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                task_id: taskId, 
-                assigned_to: assignedTo,
-                assignees: reassignSelectedMembers,
-                observers: reassignSelectedObservers
-            })
+            body: JSON.stringify(payloadReassign)
         })
         .then(res => res.json())
         .then(data => {
@@ -1518,6 +1830,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 closeModal('reassignTaskModal');
                 alert('✅ ' + data.message);
                 loadTasks();
+                loadCurrentProjects();
             } else {
                 alert('Error: ' + data.message);
             }
@@ -1525,12 +1838,19 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
     }
 
     // Modal Helpers for Creating Tasks
-    function openCreateTaskModal() {
+    function openCreateTaskModal(parentTaskId = 0, forceSubtask = false) {
         const filterProj = document.getElementById('filterProject');
         const projSelect = document.getElementById('ct_project_id');
-        if (filterProj && filterProj.value && filterProj.value !== '0' && projSelect) {
+        if (filterProj && filterProj.value && filterProj.value !== '0' && projSelect && !projSelect.value) {
             projSelect.value = filterProj.value;
         }
+
+        const isSubChk = document.getElementById('ct_is_subtask');
+        if (isSubChk) {
+            isSubChk.checked = Boolean(forceSubtask || parentTaskId > 0);
+        }
+        toggleCreateSubtaskFields();
+        loadCreateModalParentTasks(parentTaskId);
 
         const assignSelect = document.getElementById('ct_assigned_to');
         const primId = assignSelect ? parseInt(assignSelect.value) || 0 : 0;
@@ -1540,6 +1860,35 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         renderCreatePills();
         renderCreateObserverPills();
         document.getElementById('createTaskModal').style.display = 'flex';
+    }
+
+    function toggleCreateSubtaskFields() {
+        const chk = document.getElementById('ct_is_subtask');
+        const wrap = document.getElementById('ct_parent_task_wrap');
+        if (wrap) wrap.style.display = (chk && chk.checked) ? 'block' : 'none';
+    }
+
+    function loadCreateModalParentTasks(preselectId = 0) {
+        const projId = parseInt(document.getElementById('ct_project_id')?.value || '0') || 0;
+        const sel = document.getElementById('ct_parent_task_id');
+        if (!sel) return;
+        sel.innerHTML = '<option value="0">-- Standalone Project Sub-Task --</option>';
+        if (projId <= 0) return;
+
+        fetch(`api.php?action=get_tasks&project_id=${projId}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !Array.isArray(data.tasks)) return;
+                data.tasks.forEach(t => {
+                    if (parseInt(t.parent_task_id || 0) > 0 || t.task_type === 'subtask') return;
+                    const opt = document.createElement('option');
+                    opt.value = String(t.id);
+                    opt.textContent = `${t.task_code} - ${t.title}`;
+                    if (parseInt(preselectId) === parseInt(t.id)) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            })
+            .catch(() => {});
     }
 
     function onNewTaskPrimaryChanged(newVal) {
@@ -1666,6 +2015,9 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             assignedTo = createSelectedMembers[0];
         }
 
+        const isSubtask = document.getElementById('ct_is_subtask')?.checked ? 1 : 0;
+        const parentTaskId = isSubtask ? (parseInt(document.getElementById('ct_parent_task_id')?.value || '0') || 0) : 0;
+
         const payload = {
             project_id: document.getElementById('ct_project_id').value,
             title: document.getElementById('ct_title').value,
@@ -1677,7 +2029,9 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             priority: document.getElementById('ct_priority').value,
             start_date: document.getElementById('ct_start_date') ? document.getElementById('ct_start_date').value : '',
             end_date: document.getElementById('ct_end_date') ? document.getElementById('ct_end_date').value : '',
-            sla_hours: document.getElementById('ct_sla_hours').value
+            sla_hours: document.getElementById('ct_sla_hours').value,
+            is_subtask: isSubtask,
+            parent_task_id: parentTaskId
         };
 
         if (!payload.project_id || !payload.title) {
@@ -1685,7 +2039,8 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             return;
         }
 
-        fetch('api.php?action=create_task', {
+        const endpoint = isSubtask ? 'api.php?action=create_subtask' : 'api.php?action=create_task';
+        fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1769,6 +2124,35 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         return list;
     }
 
+    function toggleProjectModalHandler(uid) {
+        const id = parseInt(uid);
+        const idx = projectModalHandlers.indexOf(id);
+        if (idx > -1) projectModalHandlers.splice(idx, 1);
+        else projectModalHandlers.push(id);
+        renderProjectModalHandlersPills();
+    }
+
+    function renderProjectModalHandlersPills() {
+        const container = document.getElementById('cp_handlers_pills');
+        const badge = document.getElementById('cp_handlers_badge');
+        if (!container) return;
+        if (badge) badge.textContent = `${projectModalHandlers.length} Selected`;
+
+        let html = '';
+        allStaffUsers.forEach(u => {
+            const uid = parseInt(u.id);
+            const selected = projectModalHandlers.includes(uid);
+            html += `
+                <button type="button" onclick="toggleProjectModalHandler(${uid})"
+                    style="background:${selected ? '#2563eb' : '#ffffff'}; color:${selected ? '#ffffff' : '#334155'}; border:1px solid ${selected ? '#1d4ed8' : '#cbd5e1'}; font-size:11.5px; padding:4px 10px; border-radius:16px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                    <span>${selected ? '✓' : '+'} ${escapeHtml(u.full_name)}</span>
+                    <small style="opacity:0.8; font-size:10px;">(${escapeHtml(u.role_name || u.department)})</small>
+                </button>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
     function openCreateProjectModal() {
         document.getElementById('cp_project_id').value = '';
         document.getElementById('cp_modal_title').textContent = 'Add Current Project (Overview & Competitors)';
@@ -1792,6 +2176,9 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         document.getElementById('cp_budget_info').value = '';
         document.getElementById('cp_project_url').value = '';
         document.getElementById('cp_deliverables_summary').value = '';
+
+        projectModalHandlers = [];
+        renderProjectModalHandlersPills();
 
         const list = document.getElementById('cp_competitors_list');
         if (list) list.innerHTML = '';
@@ -1830,6 +2217,9 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 document.getElementById('cp_project_url').value = p.project_url || '';
                 document.getElementById('cp_deliverables_summary').value = p.deliverables_summary || '';
 
+                projectModalHandlers = Array.isArray(p.handler_ids) ? p.handler_ids.map(id => parseInt(id)) : [];
+                renderProjectModalHandlersPills();
+
                 const list = document.getElementById('cp_competitors_list');
                 if (list) list.innerHTML = '';
 
@@ -1851,6 +2241,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             project_name: projectName,
             department: document.getElementById('cp_department').value,
             team_lead_id: document.getElementById('cp_team_lead_id').value,
+            handlers: projectModalHandlers,
             status: document.getElementById('cp_status').value,
             priority: document.getElementById('cp_priority').value,
             start_date: document.getElementById('cp_start_date').value,
@@ -1919,6 +2310,8 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
     function openSubmitWorkModal(taskId, title) {
         document.getElementById('sw_task_id').value = taskId;
         document.getElementById('sw_task_title').textContent = title;
+        const mf = document.getElementById('sw_media_files');
+        if (mf) mf.value = '';
         document.getElementById('submitWorkModal').style.display = 'flex';
     }
     function openReviewModal(taskId, code, remarks) {
@@ -1934,9 +2327,31 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         document.getElementById('rw_changes_box').style.display = action === 'REQUEST_REVISION' ? 'block' : 'none';
     }
 
-    function submitWork() {
+    async function submitWork() {
+        const taskIdVal = document.getElementById('sw_task_id').value;
+        const mf = document.getElementById('sw_media_files');
+        if (mf && mf.files && mf.files.length > 0) {
+            const fd = new FormData();
+            fd.append('task_id', taskIdVal);
+            fd.append('caption', 'Work submission attachment');
+            fd.append('attachment_stage', 'submission');
+            for (let i = 0; i < mf.files.length; i++) {
+                fd.append('files[]', mf.files[i]);
+            }
+            try {
+                const upRes = await fetch('api.php?action=upload_task_media', { method: 'POST', body: fd });
+                const upData = await upRes.json();
+                if (!upData.success) {
+                    alert('Media Upload Error: ' + (upData.message || 'Could not upload file(s).'));
+                    return;
+                }
+            } catch (e) {
+                alert('Network error uploading media.');
+                return;
+            }
+        }
         const payload = {
-            task_id: document.getElementById('sw_task_id').value,
+            task_id: taskIdVal,
             submission_notes: document.getElementById('sw_notes').value,
             attachment_url: document.getElementById('sw_attachment_url').value
         };
@@ -1955,6 +2370,26 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 loadTasks();
             } else {
                 alert(data.message);
+            }
+        });
+    }
+
+    function leadApproveTaskInList(taskId) {
+        const comment = prompt('Lead approval note (clears Project Handler to complete task):', 'Approved by Lead for completion');
+        if (comment === null) return;
+        fetch('api.php?action=lead_approve_task', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: taskId, review_action: 'APPROVE', comment: comment || 'Approved by Lead' })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ ' + data.message);
+                loadMetrics();
+                loadTasks();
+            } else {
+                alert('⚠️ ' + (data.message || 'Lead approval failed.'));
             }
         });
     }

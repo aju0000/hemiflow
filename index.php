@@ -20,6 +20,33 @@ $projectCount = $db->query("SELECT COUNT(*) FROM projects")->fetchColumn();
 
 // Fetch recent documents
 $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clients c ON d.client_id = c.id ORDER BY d.id DESC LIMIT 5")->fetchAll();
+
+// Fetch projects the current employee is working on (Working Member or Project Handler)
+$myWorkingProjectIds = getUserWorkingProjectIds($db, $user['id']);
+$myHandledProjectIds = getUserHandledProjectIds($db, $user['id']);
+$myAllAssignedProjIds = array_values(array_unique(array_merge($myWorkingProjectIds, $myHandledProjectIds)));
+$myWorkingProjects = [];
+if (!empty($myAllAssignedProjIds)) {
+    try {
+        $phMyP = implode(',', array_fill(0, count($myAllAssignedProjIds), '?'));
+        $stMyP = $db->prepare("SELECT p.*, c.company_name, u.full_name as team_lead_name
+                               FROM projects p
+                               JOIN clients c ON p.client_id = c.id
+                               LEFT JOIN users u ON p.team_lead_id = u.id
+                               WHERE p.id IN ($phMyP)
+                               ORDER BY COALESCE(p.is_current, 1) DESC, p.id DESC");
+        $stMyP->execute($myAllAssignedProjIds);
+        $myWorkingProjects = $stMyP->fetchAll();
+    } catch (Exception $e) {}
+}
+
+// Fetch unread project assignment notifications for this employee's dashboard
+$myUnreadProjectNotifs = [];
+try {
+    $stNotifDash = $db->prepare("SELECT * FROM user_notifications WHERE user_id = ? AND is_read = 0 AND type IN ('project_member_added', 'project_handler_assigned', 'task_assigned', 'project_handover') ORDER BY id DESC LIMIT 5");
+    $stNotifDash->execute([$user['id']]);
+    $myUnreadProjectNotifs = $stNotifDash->fetchAll();
+} catch (Exception $e) {}
 ?>
 
 <div style="margin-bottom: 30px;">
@@ -49,6 +76,83 @@ $recentDocs = $db->query("SELECT d.*, c.company_name FROM documents d JOIN clien
         </div>
     </div>
 </div>
+
+<?php if (!empty($myUnreadProjectNotifs)): ?>
+<!-- Dashboard Assignment Notifications Banner -->
+<div class="card" style="margin-bottom: 24px; border: 1px solid #bfdbfe; background: #eff6ff;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <h3 style="margin:0; font-size:15px; font-weight:800; color:#1e40af; display:flex; align-items:center; gap:8px;">
+            <span>🔔 New Project &amp; Work Notifications</span>
+            <span class="badge" style="background:#2563eb; color:#ffffff; font-size:11px;"><?= count($myUnreadProjectNotifs) ?> Unread</span>
+        </h3>
+        <button type="button" class="btn btn-outline btn-sm" onclick="markAllNotificationsAsRead(event); setTimeout(() => location.reload(), 350);" style="background:#ffffff; font-size:11.5px;">Mark All Read</button>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+        <?php foreach ($myUnreadProjectNotifs as $pn): ?>
+            <?php $pnUrl = !empty($pn['link_url']) ? $pn['link_url'] : 'projects.php'; ?>
+            <div onclick="onNotificationItemClick(<?= intval($pn['id']) ?>, '<?= htmlspecialchars($pnUrl, ENT_QUOTES) ?>')" style="background:#ffffff; border:1px solid #dbeafe; border-radius:8px; padding:10px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div>
+                    <div style="font-weight:700; font-size:13px; color:#0f172a;"><?= htmlspecialchars($pn['title']) ?></div>
+                    <div style="font-size:12px; color:#475569; margin-top:2px;"><?= htmlspecialchars($pn['message']) ?></div>
+                </div>
+                <span class="btn btn-primary btn-sm" style="font-size:11.5px; white-space:nowrap;">Open &rarr;</span>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($myWorkingProjects)): ?>
+<!-- Working Employee's Active Projects Card -->
+<div class="card" style="margin-bottom: 24px; border: 1px solid #e2e8f0;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div>
+            <h3 class="card-title" style="margin:0; display:flex; align-items:center; gap:8px;">
+                <span>👥 Projects You Are Working On</span>
+                <span class="badge badge-primary" style="font-size:11px;"><?= count($myWorkingProjects) ?></span>
+            </h3>
+            <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Active projects where you have been assigned by the Team Lead or Project Handler.</p>
+        </div>
+        <?php if (hasModuleAccess('task-management')): ?>
+            <a href="projects.php?view=projects" class="btn btn-outline btn-sm">View All Projects &rarr;</a>
+        <?php endif; ?>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(290px, 1fr)); gap:14px;">
+        <?php foreach ($myWorkingProjects as $mp): ?>
+            <?php
+                $isMpHandler = in_array(intval($mp['id']), $myHandledProjectIds, true);
+                $isMpWorker = in_array(intval($mp['id']), $myWorkingProjectIds, true);
+            ?>
+            <div style="border:1px solid #e2e8f0; border-radius:10px; padding:15px; background:#f8fafc; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
+                <div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                        <?php if ($isMpWorker): ?>
+                            <span class="badge" style="background:#dbeafe; color:#1e40af; font-size:10.5px;">👤 Working Member</span>
+                        <?php endif; ?>
+                        <?php if ($isMpHandler): ?>
+                            <span class="badge" style="background:#ccfbf1; color:#0f766e; font-size:10.5px;">🛡️ Project Handler</span>
+                        <?php endif; ?>
+                        <span class="badge" style="background:#ffffff; color:#475569; border:1px solid #e2e8f0; font-size:10.5px;"><?= htmlspecialchars($mp['status'] ?? 'In Progress') ?></span>
+                    </div>
+                    <h4 style="margin:0 0 4px 0; font-size:15px; font-weight:800; color:#0f172a;"><?= htmlspecialchars($mp['project_name']) ?></h4>
+                    <div style="font-size:12px; color:#64748b;">
+                        Client: <strong style="color:#334155;"><?= htmlspecialchars($mp['company_name']) ?></strong>
+                        <?php if (!empty($mp['department'])): ?>
+                            &bull; Dept: <strong><?= htmlspecialchars($mp['department']) ?></strong>
+                        <?php endif; ?>
+                    </div>
+                    <?php if (!empty($mp['deadline'])): ?>
+                        <div style="font-size:11.5px; color:#64748b; margin-top:4px;">📅 Deadline: <strong><?= htmlspecialchars($mp['deadline']) ?></strong></div>
+                    <?php endif; ?>
+                </div>
+                <div style="padding-top:8px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+                    <a href="project_details.php?id=<?= intval($mp['id']) ?>" class="btn btn-primary btn-sm" style="font-size:12px;">Open Project Details &rarr;</a>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Metrics Cards -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px;">

@@ -490,6 +490,19 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
             </a>
             <?php endif; ?>
 
+            <?php if (canAccessOperations($user)): ?>
+            <!-- Operations & Assets: Shoot Schedules and Domain & Server Renewals -->
+            <div class="nav-label" style="margin-top:10px;">Operations & Assets</div>
+            <a href="operations.php?tab=shoots" class="nav-item <?= ($currentScript === 'operations.php' && (($_GET['tab'] ?? 'shoots') === 'shoots')) ? 'active' : '' ?>">
+                <i data-feather="video"></i>
+                <span>Shoot Schedules</span>
+            </a>
+            <a href="operations.php?tab=renewals" class="nav-item <?= ($currentScript === 'operations.php' && (($_GET['tab'] ?? '') === 'renewals')) ? 'active' : '' ?>">
+                <i data-feather="globe"></i>
+                <span>Domain & Renewals</span>
+            </a>
+            <?php endif; ?>
+
             <?php if (hasModuleAccess('reports')): ?>
             <!-- Module 9: Reports & Analytics -->
             <a href="reports.php" class="nav-item <?= $currentScript === 'reports.php' ? 'active' : '' ?>">
@@ -675,7 +688,13 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
                             <div style="padding:24px 16px; text-align:center; color:#94a3b8; font-size:12px;">Loading notifications...</div>
                         </div>
                         <div style="padding:8px 14px; text-align:center; border-top:1px solid #f1f5f9; background:#f8fafc;">
-                            <a href="projects.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">View Task Workspace &rarr;</a>
+                            <?php if (hasModuleAccess('task-management')): ?>
+                                <a href="projects.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">View Task Workspace &rarr;</a>
+                            <?php elseif (hasModuleAccess('template-generator')): ?>
+                                <a href="template_generator.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">Open Template Generator &rarr;</a>
+                            <?php else: ?>
+                                <a href="index.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">View Dashboard &rarr;</a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -940,8 +959,16 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
                 let html = '';
                 notifs.forEach(n => {
                     const isUnread = parseInt(n.is_read) === 0;
-                    const targetUrl = n.link_url || 'projects.php';
-                    const icon = (n.type === 'project_handover') ? '🚀' : ((n.type === 'leave') ? '🏖️' : '📋');
+                    const targetUrl = n.link_url || '<?= hasModuleAccess('task-management') ? 'projects.php' : (hasModuleAccess('template-generator') ? 'template_generator.php' : 'index.php') ?>';
+                    const iconMap = {
+                        project_handover: '🚀',
+                        project_member_added: '👥',
+                        project_handler_assigned: '🛡️',
+                        shoot_assigned: '🎬',
+                        renewal_assigned: '🌐',
+                        leave: '🏖️'
+                    };
+                    const icon = iconMap[n.type] || '📋';
                     const timeStr = formatNotificationTime(n.created_at);
 
                     html += `

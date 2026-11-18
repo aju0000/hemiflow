@@ -25,12 +25,16 @@ foreach ($templates as $t) {
 }
 ?>
 
-<!-- Action Pills Navigation Bar (Exact from Screenshot) -->
+<!-- Action Pills Navigation Bar -->
 <div class="action-pills-row">
-    <button class="btn-pill-primary" onclick="openNewDocumentModal()">
-        <i data-feather="plus" class="icon-prefix"></i>
-        <span>+ Add New Document</span>
+    <button class="btn-pill-primary" onclick="openQuickClientModal()">
+        <i data-feather="user-plus" class="icon-prefix"></i>
+        <span>+ Add Client</span>
         <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
+    </button>
+    <button class="btn-pill-white" onclick="openNewDocumentModal()">
+        <i data-feather="plus" class="icon-tag"></i>
+        <span>+ Add New Document</span>
     </button>
     <button class="btn-pill-white" onclick="openSavedDocumentsModal()">
         <i data-feather="folder" class="icon-folder"></i>
@@ -43,10 +47,6 @@ foreach ($templates as $t) {
     <button class="btn-pill-white" onclick="openDocumentTypesModal()">
         <i data-feather="tag" class="icon-tag"></i>
         <span>Document Types</span>
-    </button>
-    <button class="btn-pill-white" onclick="openQuickClientModal()">
-        <i data-feather="user-plus" class="icon-user"></i>
-        <span>+ Add Client</span>
     </button>
     <button class="btn-pill-white" onclick="openVersionHistoryModal()">
         <i data-feather="clock" class="icon-clock"></i>
@@ -728,7 +728,7 @@ foreach ($templates as $t) {
 
 <!-- MODAL: HANDOVER TO EXECUTION TEAMS / DEPARTMENTS -->
 <div id="handoverModal" class="modal-overlay" style="display:none; z-index:9999;">
-    <div class="modal-content" style="max-width:880px; width:95%; max-height:92vh; display:flex; flex-direction:column;">
+    <div class="modal-content" style="max-width:780px; width:95%; max-height:92vh; display:flex; flex-direction:column;">
         <div class="modal-header" style="border-bottom:1px solid #e2e8f0; padding:16px 22px;">
             <div>
                 <h3 class="modal-title" style="display:flex; align-items:center; gap:8px; font-size:18px;">
@@ -736,7 +736,7 @@ foreach ($templates as $t) {
                     Sales Handover to Departments
                 </h3>
                 <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">
-                    Assign project deliverables and features directly to responsible departments & team leads.
+                    Select one or more target departments and assign multiple team members / leads department-wise.
                 </p>
             </div>
             <button type="button" class="btn btn-outline btn-sm" onclick="closeModal('handoverModal')">&times;</button>
@@ -745,17 +745,18 @@ foreach ($templates as $t) {
             <div class="modal-body" style="overflow-y:auto; padding:20px 22px; max-height:calc(92vh - 140px);">
                 
                 <!-- Client Banner -->
-                <div id="ho_client_info_banner" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:18px;">
+                <div id="ho_client_info_banner" style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:16px;">
                     Loading target client information...
                 </div>
 
-                <!-- Section 1: Project Overview -->
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:20px;">
+                <!-- Project Overview -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px;">
                     <div style="font-size:13px; font-weight:700; color:#334155; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
                         <i data-feather="folder" style="width:14px; height:14px; color:#475569;"></i>
                         Project Overview
                     </div>
-                    <div class="grid-2" style="margin-bottom:12px;">
+
+                    <div class="grid-3" style="grid-template-columns: 2fr 1fr 1fr; gap:12px; margin-bottom:14px;">
                         <div class="form-group" style="margin-bottom:0;">
                             <label class="form-label" style="font-weight:600;">Project / Work Title *</label>
                             <input type="text" id="ho_project_name" class="form-control" required placeholder="e.g. Website Redesign & Branding">
@@ -764,22 +765,8 @@ foreach ($templates as $t) {
                             <label class="form-label" style="font-weight:600;">Overall Target Deadline *</label>
                             <input type="date" id="ho_deadline" class="form-control" required value="<?= date('Y-m-d', strtotime('+14 days')) ?>">
                         </div>
-                    </div>
-                    <div class="grid-3" style="margin-bottom:12px;">
                         <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label" style="font-weight:600;">Primary Department</label>
-                            <select id="ho_primary_department" class="form-select" onchange="onPrimaryDeptChange()">
-                                <!-- Populated dynamically -->
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label" style="font-weight:600;">Overall Team Lead / Manager</label>
-                            <select id="ho_team_lead" class="form-select" required>
-                                <!-- Populated dynamically -->
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom:0;">
-                            <label class="form-label" style="font-weight:600;">Overall Priority</label>
+                            <label class="form-label" style="font-weight:600;">Priority</label>
                             <select id="ho_priority" class="form-select">
                                 <option value="Urgent">Urgent</option>
                                 <option value="High" selected>High</option>
@@ -788,32 +775,36 @@ foreach ($templates as $t) {
                             </select>
                         </div>
                     </div>
+
+                    <!-- Multi-Department Selection -->
+                    <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:14px; margin-bottom:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                            <label class="form-label" style="margin:0; font-weight:700; color:#0f172a; font-size:13px;">
+                                📁 Target Departments * <span style="font-weight:500; color:#64748b; font-size:11.5px;">(Click to select one or multiple departments)</span>
+                            </label>
+                            <span id="ho_depts_badge" class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:11px; padding:3px 9px; border-radius:12px;">0 Departments</span>
+                        </div>
+                        <div id="ho_departments_pills" style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <!-- Department toggle pills rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Department-Wise Multiple Assignees -->
+                    <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:14px; margin-bottom:14px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+                            <label class="form-label" style="margin:0; font-weight:700; color:#0f172a; font-size:13px;">
+                                👥 Department-Wise Assignees * <span style="font-weight:500; color:#64748b; font-size:11.5px;">(Multiple assignees allowed per department)</span>
+                            </label>
+                            <span id="ho_assignees_badge" class="badge" style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 9px; border-radius:12px;">0 Assignees Selected</span>
+                        </div>
+                        <div id="ho_dept_assignees_container" style="display:flex; flex-direction:column; gap:12px;">
+                            <!-- Department-wise assignee cards rendered dynamically -->
+                        </div>
+                    </div>
+
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label" style="font-weight:600;">Handover Notes & Overall Scope Overview</label>
-                        <textarea id="ho_description" class="form-control" rows="2" placeholder="General scope, client preferences, or key milestones..."></textarea>
-                    </div>
-                </div>
-
-                <!-- Section 2: Features & Deliverables by Department -->
-                <div style="border:1px solid #cbd5e1; border-radius:8px; padding:16px; background:#ffffff;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
-                        <div>
-                            <div style="font-size:13px; font-weight:700; color:#1e293b; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px;">
-                                <i data-feather="layers" style="width:14px; height:14px; color:#2563eb;"></i>
-                                Department Features & Deliverables
-                                <span id="ho_features_count_badge" class="badge badge-primary" style="font-size:11px; padding:2px 8px; border-radius:10px;">1 Feature</span>
-                            </div>
-                            <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">
-                                Break down work so each department receives its specific task, auto-assigned to its Team Lead.
-                            </p>
-                        </div>
-                        <button type="button" class="btn btn-outline btn-sm" onclick="addFeatureRow()" style="color:#2563eb; border-color:#93c5fd; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
-                            <i data-feather="plus" style="width:13px; height:13px;"></i> Add Feature
-                        </button>
-                    </div>
-
-                    <div id="ho_features_container" style="display:flex; flex-direction:column; gap:14px;">
-                        <!-- Feature rows injected dynamically -->
+                        <textarea id="ho_description" class="form-control" rows="3" placeholder="General scope, client preferences, or key milestones..."></textarea>
                     </div>
                 </div>
 
@@ -1875,6 +1866,247 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         });
     }
 
+    let handoverSelectedDepts = [];
+    let handoverDeptAssignees = {}; // { [deptName]: [userId, ...] }
+
+    function isUserLeadOrManager(u) {
+        const roleName = (u.role_name || '').toLowerCase();
+        const rid = parseInt(u.role_id || 0);
+        return rid === 1 || rid === 4 || rid === 18 || roleName.includes('lead') || roleName.includes('manager') || roleName.includes('admin');
+    }
+
+    function getExecutionDepartments() {
+        const seen = new Set();
+        const list = [];
+        // Prefer departments that actually have active non-Client staff first, plus all non-Sales system departments
+        (systemDepartments || []).forEach(d => {
+            const name = (d.name || '').trim();
+            if (!name || name.toLowerCase() === 'sales') return;
+            const key = name.toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push(name);
+            }
+        });
+        // Also include any department present on active internal users
+        (systemUsers || []).forEach(u => {
+            if ((u.role_name || '').toLowerCase() === 'client') return;
+            const name = (u.department || '').trim();
+            if (!name || name.toLowerCase() === 'sales') return;
+            const key = name.toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                list.push(name);
+            }
+        });
+        return list;
+    }
+
+    function getActiveStaffForDept(deptName) {
+        const norm = (deptName || '').toLowerCase();
+        return (systemUsers || [])
+            .filter(u => (u.role_name || '').toLowerCase() !== 'client' && (u.department || '').toLowerCase() === norm)
+            .sort((a, b) => {
+                const aLead = isUserLeadOrManager(a) ? 0 : 1;
+                const bLead = isUserLeadOrManager(b) ? 0 : 1;
+                if (aLead !== bLead) return aLead - bLead;
+                return (a.full_name || '').localeCompare(b.full_name || '');
+            });
+    }
+
+    function toggleHandoverDepartment(deptName) {
+        const idx = handoverSelectedDepts.indexOf(deptName);
+        if (idx >= 0) {
+            handoverSelectedDepts.splice(idx, 1);
+            delete handoverDeptAssignees[deptName];
+        } else {
+            handoverSelectedDepts.push(deptName);
+            const deptStaff = getActiveStaffForDept(deptName);
+            const lead = findDepartmentLead(deptName);
+            if (lead && deptStaff.some(u => parseInt(u.id) === parseInt(lead.id))) {
+                handoverDeptAssignees[deptName] = [parseInt(lead.id)];
+            } else if (deptStaff.length > 0) {
+                handoverDeptAssignees[deptName] = [parseInt(deptStaff[0].id)];
+            } else if (lead) {
+                handoverDeptAssignees[deptName] = [parseInt(lead.id)];
+            } else {
+                handoverDeptAssignees[deptName] = [];
+            }
+        }
+        renderHandoverDepartments();
+        renderHandoverDeptAssignees();
+    }
+
+    function toggleHandoverDeptAssignee(deptName, userId) {
+        const uid = parseInt(userId);
+        if (!handoverDeptAssignees[deptName]) handoverDeptAssignees[deptName] = [];
+        const list = handoverDeptAssignees[deptName];
+        const idx = list.indexOf(uid);
+        if (idx >= 0) {
+            list.splice(idx, 1);
+        } else {
+            list.push(uid);
+        }
+        renderHandoverDeptAssignees();
+    }
+
+    function selectAllDeptAssignees(deptName) {
+        const deptStaff = getActiveStaffForDept(deptName);
+        const existing = handoverDeptAssignees[deptName] || [];
+        const merged = new Set(existing);
+        deptStaff.forEach(u => merged.add(parseInt(u.id)));
+        handoverDeptAssignees[deptName] = Array.from(merged);
+        renderHandoverDeptAssignees();
+    }
+
+    function clearDeptAssignees(deptName) {
+        handoverDeptAssignees[deptName] = [];
+        renderHandoverDeptAssignees();
+    }
+
+    function addExtraAssigneeToDept(deptName, selectEl) {
+        const uid = parseInt(selectEl.value || 0);
+        if (!uid) return;
+        if (!handoverDeptAssignees[deptName]) handoverDeptAssignees[deptName] = [];
+        if (!handoverDeptAssignees[deptName].includes(uid)) {
+            handoverDeptAssignees[deptName].push(uid);
+        }
+        selectEl.value = '';
+        renderHandoverDeptAssignees();
+    }
+
+    function renderHandoverDepartments() {
+        const container = document.getElementById('ho_departments_pills');
+        const badge = document.getElementById('ho_depts_badge');
+        if (!container) return;
+
+        const depts = getExecutionDepartments();
+        if (badge) {
+            const cnt = handoverSelectedDepts.length;
+            badge.textContent = `${cnt} Department${cnt === 1 ? '' : 's'} Selected`;
+        }
+
+        let html = '';
+        depts.forEach(deptName => {
+            const isSel = handoverSelectedDepts.includes(deptName);
+            const staffCount = getActiveStaffForDept(deptName).length;
+            const safeDeptJs = JSON.stringify(deptName).replace(/'/g, '&#39;');
+            html += `
+                <button type="button" onclick='toggleHandoverDepartment(${safeDeptJs})'
+                    style="background:${isSel ? '#2563eb' : '#f8fafc'}; color:${isSel ? '#ffffff' : '#334155'}; border:1px solid ${isSel ? '#1d4ed8' : '#cbd5e1'}; font-size:12px; padding:6px 12px; border-radius:18px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s ease;">
+                    <span>${isSel ? '✓' : '+'} ${escapeHtml(deptName)}</span>
+                    ${staffCount > 0 ? `<small style="opacity:0.8; font-size:10.5px;">(${staffCount})</small>` : ''}
+                </button>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function renderHandoverDeptAssignees() {
+        const container = document.getElementById('ho_dept_assignees_container');
+        const badge = document.getElementById('ho_assignees_badge');
+        if (!container) return;
+
+        const allUniqueIds = new Set();
+        handoverSelectedDepts.forEach(d => {
+            (handoverDeptAssignees[d] || []).forEach(id => allUniqueIds.add(parseInt(id)));
+        });
+
+        if (badge) {
+            const totalA = allUniqueIds.size;
+            const totalD = handoverSelectedDepts.length;
+            badge.textContent = `${totalA} Assignee${totalA === 1 ? '' : 's'} across ${totalD} Dept${totalD === 1 ? '' : 's'}`;
+        }
+
+        if (handoverSelectedDepts.length === 0) {
+            container.innerHTML = `<div style="padding:16px; text-align:center; color:#94a3b8; font-size:12.5px; background:#f8fafc; border-radius:8px; border:1px dashed #cbd5e1;">
+                Select one or more departments above to pick assignees.
+            </div>`;
+            return;
+        }
+
+        const internalStaff = (systemUsers || []).filter(u => (u.role_name || '').toLowerCase() !== 'client');
+
+        let html = '';
+        handoverSelectedDepts.forEach(deptName => {
+            const selectedIds = handoverDeptAssignees[deptName] || [];
+            const deptStaff = getActiveStaffForDept(deptName);
+            const deptStaffIds = new Set(deptStaff.map(u => parseInt(u.id)));
+            // Also show any cross-department users already selected for this department
+            const extraSelectedUsers = selectedIds
+                .filter(uid => !deptStaffIds.has(parseInt(uid)))
+                .map(uid => internalStaff.find(u => parseInt(u.id) === parseInt(uid)))
+                .filter(Boolean);
+            const displayedStaff = [...deptStaff, ...extraSelectedUsers];
+            const displayedIds = new Set(displayedStaff.map(u => parseInt(u.id)));
+            const otherStaffOptions = internalStaff
+                .filter(u => !displayedIds.has(parseInt(u.id)))
+                .sort((a, b) => {
+                    const aL = isUserLeadOrManager(a) ? 0 : 1;
+                    const bL = isUserLeadOrManager(b) ? 0 : 1;
+                    if (aL !== bL) return aL - bL;
+                    return (a.full_name || '').localeCompare(b.full_name || '');
+                });
+
+            const safeDeptJs = JSON.stringify(deptName).replace(/'/g, '&#39;');
+
+            let pillsHtml = '';
+            if (displayedStaff.length === 0) {
+                pillsHtml = `<span style="font-size:12px; color:#94a3b8; font-style:italic;">No members directly in ${escapeHtml(deptName)}. Use the dropdown below to pick a Lead or team member.</span>`;
+            } else {
+                displayedStaff.forEach(u => {
+                    const uid = parseInt(u.id);
+                    const isSel = selectedIds.includes(uid);
+                    const isLead = isUserLeadOrManager(u);
+                    pillsHtml += `
+                        <button type="button" onclick='toggleHandoverDeptAssignee(${safeDeptJs}, ${uid})'
+                            style="background:${isSel ? '#2563eb' : '#ffffff'}; color:${isSel ? '#ffffff' : '#334155'}; border:1px solid ${isSel ? '#1d4ed8' : '#cbd5e1'}; font-size:11.5px; padding:4px 10px; border-radius:16px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px; transition:all 0.12s ease;">
+                            <span>${isSel ? '✓' : '+'} ${isLead ? '★ ' : ''}${escapeHtml(u.full_name)}</span>
+                            <small style="opacity:0.8; font-size:10px;">(${escapeHtml(u.role_name || u.department)})</small>
+                        </button>
+                    `;
+                });
+            }
+
+            let extraDropdownHtml = '';
+            if (otherStaffOptions.length > 0) {
+                const opts = otherStaffOptions.map(u => `<option value="${u.id}">${isUserLeadOrManager(u) ? '★ ' : ''}${escapeHtml(u.full_name)} (${escapeHtml(u.role_name || '')} - ${escapeHtml(u.department || 'General')})</option>`).join('');
+                extraDropdownHtml = `
+                    <div style="margin-top:8px;">
+                        <select class="form-select" style="font-size:11.5px; padding:4px 8px; max-width:300px; height:30px; color:#475569;" onchange='addExtraAssigneeToDept(${safeDeptJs}, this)'>
+                            <option value="">+ Add Lead / Staff from another department...</option>
+                            ${opts}
+                        </select>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <strong style="font-size:12.5px; color:#1e293b;">📁 ${escapeHtml(deptName)}</strong>
+                            <span class="badge" style="background:${selectedIds.length > 0 ? '#dbeafe' : '#fee2e2'}; color:${selectedIds.length > 0 ? '#1e40af' : '#b91c1c'}; font-size:10.5px; padding:2px 7px; border-radius:10px;">
+                                ${selectedIds.length} Selected
+                            </span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            ${deptStaff.length > 0 ? `<button type="button" onclick='selectAllDeptAssignees(${safeDeptJs})' style="background:none; border:none; color:#2563eb; font-size:11px; font-weight:700; cursor:pointer; padding:0;">Select All</button>` : ''}
+                            ${selectedIds.length > 0 ? `<button type="button" onclick='clearDeptAssignees(${safeDeptJs})' style="background:none; border:none; color:#64748b; font-size:11px; font-weight:600; cursor:pointer; padding:0;">Clear</button>` : ''}
+                            ${handoverSelectedDepts.length > 1 ? `<button type="button" onclick='toggleHandoverDepartment(${safeDeptJs})' style="background:none; border:none; color:#ef4444; font-size:13px; font-weight:700; cursor:pointer; padding:0 4px;" title="Remove department">&times;</button>` : ''}
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                        ${pillsHtml}
+                    </div>
+                    ${extraDropdownHtml}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
     async function openHandoverModal() {
         if (!currentSavedDocId) { 
             alert('Please generate and save the document first before submitting handover.'); 
@@ -1916,16 +2148,19 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             const resDoc = await fetch(`api.php?action=get_document_details&id=${currentSavedDocId}`).then(r => r.json());
             if (resDoc.success && resDoc.document) {
                 docData = resDoc.document;
+                const clientLabel = docData.company_name || docData.client_name || 'Client';
                 const banner = document.getElementById('ho_client_info_banner');
                 if (banner) {
-                    banner.innerHTML = `<strong>Target Client:</strong> ${escapeHtml(docData.company_name || docData.client_name)} &nbsp;|&nbsp; <strong>Doc:</strong> #${escapeHtml(docData.document_number)} - ${escapeHtml(docData.title)}`;
+                    banner.innerHTML = `<strong>Target Client:</strong> ${escapeHtml(clientLabel)} &nbsp;|&nbsp; <strong>Doc:</strong> #${escapeHtml(docData.document_number)} - ${escapeHtml(docData.title)}`;
                 }
             }
         } catch (e) {
             console.error("Error fetching doc details", e);
         }
 
-        const defaultTitle = docData ? (docData.company_name + ' - ' + docData.title) : (document.getElementById('previewDocTitle').textContent || 'New Project Handover');
+        const clientNameStr = docData ? (docData.company_name || docData.client_name || '').trim() : '';
+        const docTitleStr = docData ? (docData.title || '').trim() : (document.getElementById('previewDocTitle').textContent || 'New Project Handover');
+        const defaultTitle = clientNameStr ? `${clientNameStr} - ${docTitleStr}` : docTitleStr;
         document.getElementById('ho_project_name').value = defaultTitle;
 
         const defaultNotes = (docData && docData.custom_fields && docData.custom_fields.CUSTOM_NOTES) 
@@ -1933,51 +2168,17 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             : (document.getElementById('customNotes') ? document.getElementById('customNotes').value : '');
         document.getElementById('ho_description').value = defaultNotes;
 
-        // Initialize features list from custom scope or fallback
-        const scopeText = (docData && docData.custom_fields && docData.custom_fields.CUSTOM_SCOPE) 
-            ? docData.custom_fields.CUSTOM_SCOPE 
-            : (document.getElementById('customScope') ? document.getElementById('customScope').value : '');
-        
-        let parsed = parseScopeIntoFeatures(scopeText);
-        if (parsed.length === 0) {
-            const serviceName = (docData && docData.service_name) ? docData.service_name : (docData ? docData.title : 'Project Deliverables');
-            const dept = guessDepartment(serviceName);
-            const targetDept = dept === 'Sales' ? 'Development' : dept;
-            const lead = findDepartmentLead(targetDept);
-            parsed = [{
-                title: serviceName + ' Execution',
-                department: targetDept,
-                team_lead_id: lead ? parseInt(lead.id) : 0,
-                observers: [],
-                priority: 'High',
-                sla_hours: 48,
-                notes: ''
-            }];
-        }
+        // Determine initial department automatically based on service/title
+        const serviceName = (docData && docData.service_name) ? docData.service_name : (docData ? docData.title : 'Development');
+        const guessedDept = guessDepartment(serviceName);
+        const execDepts = getExecutionDepartments();
+        let initialDept = (!guessedDept || guessedDept.toLowerCase() === 'sales') ? 'Development' : guessedDept;
+        const matchedDept = execDepts.find(d => d.toLowerCase() === initialDept.toLowerCase());
+        initialDept = matchedDept || execDepts[0] || 'Development';
 
-        const myId = currentLoggedInUser ? parseInt(currentLoggedInUser.id) : 0;
-        handoverFeatures = [];
-        parsed.forEach(pf => {
-            const dept = (pf.department === 'Sales') ? 'Development' : pf.department;
-            const lead = findDepartmentLead(dept);
-            handoverFeatures.push({
-                title: pf.title,
-                department: dept,
-                team_lead_id: pf.team_lead_id || (lead ? parseInt(lead.id) : 0),
-                observers: myId ? [myId] : [], // Pre-seed sales user as observer
-                priority: pf.priority || 'High',
-                sla_hours: pf.sla_hours || 48,
-                notes: pf.notes || ''
-            });
-        });
-
-        // Determine primary department based on first feature
-        const primaryDept = handoverFeatures[0] ? handoverFeatures[0].department : 'Development';
-        populatePrimaryDeptDropdown(primaryDept);
-        onPrimaryDeptChange();
-
-        // Render features
-        renderFeatures();
+        handoverSelectedDepts = [];
+        handoverDeptAssignees = {};
+        toggleHandoverDepartment(initialDept);
 
         document.getElementById('handoverModal').style.display = 'flex';
         if (window.feather) feather.replace();
@@ -2039,48 +2240,69 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             return;
         }
 
-        syncFeaturesFromDOM();
-
         const projectName = document.getElementById('ho_project_name').value.trim();
         if (!projectName) {
             alert('Please enter a valid Project / Work Title.');
             return;
         }
 
-        if (handoverFeatures.length === 0) {
-            alert('Please add at least one feature deliverable for handover.');
+        if (handoverSelectedDepts.length === 0) {
+            alert('Please select at least one Target Department.');
             return;
         }
 
-        for (let i = 0; i < handoverFeatures.length; i++) {
-            if (!handoverFeatures[i].title || !handoverFeatures[i].title.trim()) {
-                alert(`Please enter a title for Feature #${i + 1}.`);
+        // Validate every selected department has at least one assignee
+        for (const dept of handoverSelectedDepts) {
+            const list = handoverDeptAssignees[dept] || [];
+            if (list.length === 0) {
+                alert(`Please select at least one assignee for the ${dept} department.`);
                 return;
             }
         }
 
-        const teamLeadElem = document.getElementById('ho_team_lead');
-        const teamLeadId = teamLeadElem ? (parseInt(teamLeadElem.value) || 0) : 0;
-        const primaryDept = document.getElementById('ho_primary_department') ? document.getElementById('ho_primary_department').value : 'Development';
+        const priorityVal = document.getElementById('ho_priority').value;
+        const deadlineVal = document.getElementById('ho_deadline').value;
+        const descriptionVal = document.getElementById('ho_description').value;
+        const myId = currentLoggedInUser ? parseInt(currentLoggedInUser.id) : 0;
+
+        // Build department-wise handover items with multiple assignees
+        const deptFeatures = handoverSelectedDepts.map(dept => {
+            const assignees = Array.from(new Set((handoverDeptAssignees[dept] || []).map(x => parseInt(x)).filter(x => x > 0)));
+            // Pick Lead among selected assignees first, else department lead, else first selected assignee
+            let leadUser = assignees
+                .map(uid => systemUsers.find(u => parseInt(u.id) === uid))
+                .find(u => u && isUserLeadOrManager(u));
+            if (!leadUser) {
+                leadUser = findDepartmentLead(dept);
+            }
+            const deptLeadId = leadUser ? parseInt(leadUser.id) : (assignees[0] || 0);
+            const taskTitle = handoverSelectedDepts.length > 1 ? `${projectName} (${dept})` : projectName;
+
+            return {
+                title: taskTitle,
+                department: dept,
+                team_lead_id: deptLeadId,
+                assigned_to: assignees[0] || deptLeadId,
+                assignees: assignees,
+                observers: myId ? [myId] : [],
+                priority: priorityVal,
+                sla_hours: 48,
+                notes: descriptionVal
+            };
+        });
+
+        const primaryDept = handoverSelectedDepts[0] || 'Development';
+        const overallTeamLeadId = deptFeatures[0] ? deptFeatures[0].team_lead_id : 0;
 
         const payload = {
             document_id: currentSavedDocId,
             project_name: projectName,
             primary_department: primaryDept,
-            team_lead_id: teamLeadId,
-            priority: document.getElementById('ho_priority').value,
-            deadline: document.getElementById('ho_deadline').value,
-            description: document.getElementById('ho_description').value,
-            features: handoverFeatures.map(f => ({
-                title: f.title,
-                department: f.department,
-                team_lead_id: f.team_lead_id,
-                assigned_to: f.team_lead_id,
-                observers: f.observers || [],
-                priority: f.priority,
-                sla_hours: f.sla_hours,
-                notes: f.notes
-            }))
+            team_lead_id: overallTeamLeadId,
+            priority: priorityVal,
+            deadline: deadlineVal,
+            description: descriptionVal,
+            features: deptFeatures
         };
 
         const submitBtn = document.querySelector('#handoverModal button[type="submit"]');
@@ -2088,6 +2310,8 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             submitBtn.disabled = true;
             submitBtn.textContent = 'Processing Handover...';
         }
+
+        const canAccessTaskHub = <?= hasModuleAccess('task-management') ? 'true' : 'false' ?>;
 
         fetch('api.php?action=handover_to_project', {
             method: 'POST',
@@ -2102,8 +2326,16 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
             }
             if (data.success) {
                 closeModal('handoverModal');
-                alert(data.message);
-                window.location.href = 'projects.php';
+                alert('✅ ' + (data.message || 'Project handed over successfully!'));
+                if (canAccessTaskHub) {
+                    window.location.href = 'projects.php';
+                } else {
+                    const hoBtn = document.getElementById('handoverBtn');
+                    if (hoBtn) {
+                        hoBtn.innerHTML = '✅ Handed Over';
+                        hoBtn.disabled = true;
+                    }
+                }
             } else {
                 alert('Handover Error: ' + (data.message || 'Failed to process handover.'));
             }

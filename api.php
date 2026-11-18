@@ -9,6 +9,7 @@ require_once __DIR__ . '/auth.php';
 
 $action = $_GET['action'] ?? '';
 $db = getDbConnection();
+ensureProjectWorkflowSchema($db);
 $input = json_decode(file_get_contents('php://input'), true) ?? $_POST;
 
 if (!function_exists('calculateTaskSLAStatus')) {
@@ -38,14 +39,25 @@ if (!function_exists('calculateTaskSLAStatus')) {
 if (!function_exists('ensureDocumentTypesTable')) {
     function ensureDocumentTypesTable($db) {
         try {
-            $db->exec("CREATE TABLE IF NOT EXISTS document_types (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                description TEXT,
-                icon_name VARCHAR(50) DEFAULT 'file-text',
-            is_active INTEGER DEFAULT 1,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )");
+            if (defined('DB_TYPE') && DB_TYPE === 'mysql') {
+                $db->exec("CREATE TABLE IF NOT EXISTS document_types (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    description TEXT,
+                    icon_name VARCHAR(50) DEFAULT 'file-text',
+                    is_active TINYINT DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } else {
+                $db->exec("CREATE TABLE IF NOT EXISTS document_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    description TEXT,
+                    icon_name VARCHAR(50) DEFAULT 'file-text',
+                    is_active INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+            }
 
         $count = $db->query("SELECT COUNT(*) FROM document_types")->fetchColumn();
         if ($count == 0) {
@@ -76,16 +88,31 @@ if (!function_exists('ensureDocumentTypesTable')) {
 
 if (!function_exists('ensureUserNotificationsTable')) {
     function ensureUserNotificationsTable($db) {
-        $db->exec("CREATE TABLE IF NOT EXISTS user_notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            title VARCHAR(255) NOT NULL,
-            message TEXT NOT NULL,
-            type VARCHAR(50) DEFAULT 'general',
-            link_url VARCHAR(255) DEFAULT '',
-            is_read INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )");
+        try {
+            if (defined('DB_TYPE') && DB_TYPE === 'mysql') {
+                $db->exec("CREATE TABLE IF NOT EXISTS user_notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    type VARCHAR(50) DEFAULT 'general',
+                    link_url VARCHAR(255) DEFAULT '',
+                    is_read TINYINT DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } else {
+                $db->exec("CREATE TABLE IF NOT EXISTS user_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    type VARCHAR(50) DEFAULT 'general',
+                    link_url VARCHAR(255) DEFAULT '',
+                    is_read INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )");
+            }
+        } catch (Exception $e) {}
     }
 }
 
@@ -110,11 +137,176 @@ if (!function_exists('notifyTaskAssignees')) {
     }
 }
 
+if (!function_exists('notifyProjectHandlers')) {
+    function notifyProjectHandlers($db, $projectId, $projectName, $handlerIds, $assignedByUser) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)$handlerIds), function ($x) { return $x > 0; })));
+        if (empty($ids) || intval($projectId) <= 0) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $assignerName = trim($assignedByUser['full_name'] ?? ($assignedByUser['username'] ?? 'Team Lead'));
+            $title = "🛡️ Project Handler Assigned: {$projectName}";
+            $message = "{$assignerName} added you as a Project Handler on \"{$projectName}\". Click to manage tasks, sub-tasks, and approvals.";
+            $linkUrl = "project_details.php?id=" . intval($projectId);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'project_handler_assigned', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($ids as $targetUid) {
+                $stmt->execute([$targetUid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyProjectWorkingEmployees')) {
+    function notifyProjectWorkingEmployees($db, $projectId, $projectName, $clientName, $memberIds, $assignedByUser) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)$memberIds), function ($x) { return $x > 0; })));
+        if (empty($ids) || intval($projectId) <= 0) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $assignerName = trim($assignedByUser['full_name'] ?? ($assignedByUser['username'] ?? 'Project Handler'));
+            $clientSuffix = !empty($clientName) ? " ({$clientName})" : "";
+            $title = "👥 Added to Project Team: {$projectName}";
+            $message = "{$assignerName} added you as a working team member on project \"{$projectName}\"{$clientSuffix}. Click to view project overview & tasks on your dashboard.";
+            $linkUrl = "project_details.php?id=" . intval($projectId);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'project_member_added', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($ids as $targetUid) {
+                $stmt->execute([$targetUid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyProjectHandlersForReview')) {
+    function notifyProjectHandlersForReview($db, $task, $submittedByUser) {
+        if (!$task || empty($task['project_id'])) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $targets = getProjectHandlerIds($db, intval($task['project_id']));
+            if (!empty($task['team_lead_id']) && intval($task['team_lead_id']) > 0) {
+                $targets[] = intval($task['team_lead_id']);
+            }
+            $targets = array_values(array_unique(array_filter($targets, function ($uid) use ($submittedByUser) {
+                return $uid > 0 && $uid !== intval($submittedByUser['id'] ?? 0);
+            })));
+            if (empty($targets)) return;
+            $empName = trim($submittedByUser['full_name'] ?? ($submittedByUser['username'] ?? 'Employee'));
+            $tCode = $task['task_code'] ?? ('TSK-' . intval($task['id']));
+            $title = "🔍 Ready for Handler Approval: #{$tCode}";
+            $message = "{$empName} submitted \"{$task['title']}\" for Project Handler approval before client review.";
+            $linkUrl = "task_details.php?id=" . intval($task['id']);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'task_review_requested', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($targets as $uid) {
+                $stmt->execute([$uid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyLeadsForTaskApproval')) {
+    function notifyLeadsForTaskApproval($db, $task, $approvedByHandlerUser) {
+        if (!$task || empty($task['project_id'])) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $targets = [];
+            if (!empty($task['team_lead_id']) && intval($task['team_lead_id']) > 0) {
+                $targets[] = intval($task['team_lead_id']);
+            }
+            $stLeads = $db->query("SELECT u.id FROM users u JOIN roles r ON u.role_id = r.id WHERE COALESCE(u.is_active, 1) = 1 AND r.name IN ('Team Lead', 'DM Lead')");
+            if ($stLeads) {
+                while ($r = $stLeads->fetch()) {
+                    $targets[] = intval($r['id']);
+                }
+            }
+            $targets = array_values(array_unique(array_filter($targets, function ($uid) use ($approvedByHandlerUser) {
+                return $uid > 0 && $uid !== intval($approvedByHandlerUser['id'] ?? 0);
+            })));
+            if (empty($targets)) return;
+            $handlerName = trim($approvedByHandlerUser['full_name'] ?? ($approvedByHandlerUser['username'] ?? 'Project Handler'));
+            $tCode = $task['task_code'] ?? ('TSK-' . intval($task['id']));
+            $title = "📝 Lead Approval Required: #{$tCode}";
+            $message = "{$handlerName} approved \"{$task['title']}\". Your Lead approval is required before the handler can complete this task.";
+            $linkUrl = "task_details.php?id=" . intval($task['id']);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'task_lead_approval_needed', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($targets as $uid) {
+                $stmt->execute([$uid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyHandlerLeadApproved')) {
+    function notifyHandlerLeadApproved($db, $task, $leadUser) {
+        if (!$task || empty($task['project_id'])) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $targets = getProjectHandlerIds($db, intval($task['project_id']));
+            $targets = array_values(array_unique(array_filter($targets, function ($uid) use ($leadUser) {
+                return $uid > 0 && $uid !== intval($leadUser['id'] ?? 0);
+            })));
+            if (empty($targets)) return;
+            $leadName = trim($leadUser['full_name'] ?? ($leadUser['username'] ?? 'Team Lead'));
+            $tCode = $task['task_code'] ?? ('TSK-' . intval($task['id']));
+            $title = "✅ Lead Approved Task: #{$tCode}";
+            $message = "{$leadName} approved \"{$task['title']}\". You can now tick 'Approved by Client' to complete the task.";
+            $linkUrl = "task_details.php?id=" . intval($task['id']);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'task_lead_approved', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($targets as $uid) {
+                $stmt->execute([$uid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyShootAssignees')) {
+    function notifyShootAssignees($db, $shootId, $clientName, $shootDate, $venue, $assigneeIds, $assignedByUser) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)$assigneeIds), function ($x) { return $x > 0; })));
+        if (empty($ids) || intval($shootId) <= 0) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $assignerName = trim($assignedByUser['full_name'] ?? ($assignedByUser['username'] ?? 'Super Admin'));
+            $formattedDate = date('M d, Y h:i A', strtotime($shootDate));
+            $title = "🎬 Shoot Scheduled: {$clientName}";
+            $venueText = !empty($venue) ? " at {$venue}" : "";
+            $message = "{$assignerName} assigned you to a shoot for {$clientName} on {$formattedDate}{$venueText}. Click to view details.";
+            $linkUrl = "operations.php?tab=shoots&id=" . intval($shootId);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'shoot_assigned', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($ids as $targetUid) {
+                $stmt->execute([$targetUid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
+if (!function_exists('notifyRenewalAssignees')) {
+    function notifyRenewalAssignees($db, $renewalId, $domainName, $clientName, $domainExpiry, $assigneeIds, $assignedByUser) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)$assigneeIds), function ($x) { return $x > 0; })));
+        if (empty($ids) || intval($renewalId) <= 0) return;
+        try {
+            ensureUserNotificationsTable($db);
+            $assignerName = trim($assignedByUser['full_name'] ?? ($assignedByUser['username'] ?? 'Super Admin'));
+            $expiryStr = !empty($domainExpiry) ? (" (Expires: " . date('M d, Y', strtotime($domainExpiry)) . ")") : "";
+            $title = "🌐 Renewal Incharge: {$domainName}";
+            $message = "{$assignerName} assigned you as incharge for {$domainName} ({$clientName}){$expiryStr}. Click to view details.";
+            $linkUrl = "operations.php?tab=renewals&id=" . intval($renewalId);
+            $stmt = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'renewal_assigned', ?, 0, CURRENT_TIMESTAMP)");
+            foreach ($ids as $targetUid) {
+                $stmt->execute([$targetUid, $title, $message, $linkUrl]);
+            }
+        } catch (Exception $e) {}
+    }
+}
+
 if (!function_exists('isTaskVisibleToUser')) {
     function isTaskVisibleToUser($task, $userId, $db = null) {
         $uid = intval($userId);
         if ($uid <= 0 || !$task) return false;
         if (intval($task['assigned_to'] ?? 0) === $uid) return true;
+        if ($db && !empty($task['project_id']) && isProjectHandler($db, intval($task['project_id']), $uid)) {
+            return true;
+        }
+        if ($db && !empty($task['project_id']) && function_exists('getProjectObserverIds')) {
+            if (in_array($uid, getProjectObserverIds($db, intval($task['project_id'])), true)) {
+                return true;
+            }
+        }
 
         $assignees = json_decode($task['assignees_json'] ?? '[]', true);
         if (is_array($assignees) && in_array($uid, array_map('intval', $assignees), true)) {
@@ -138,14 +330,27 @@ if (!function_exists('isTaskVisibleToUser')) {
 }
 
 if (!function_exists('buildTaskUserMatchWhere')) {
-    function buildTaskUserMatchWhere($userId, &$params, $alias = 't') {
+    function buildTaskUserMatchWhere($userId, &$params, $alias = 't', $db = null, $includeHandledProjects = true) {
         $uid = intval($userId);
         $like = '%' . $uid . '%';
         $params[] = $uid;
         $params[] = $uid;
         $params[] = $like;
         $params[] = $like;
-        return "({$alias}.assigned_to = ? OR EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = {$alias}.id AND ta.user_id = ?) OR {$alias}.assignees_json LIKE ? OR {$alias}.observers_json LIKE ?)";
+        $clauses = [
+            "{$alias}.assigned_to = ?",
+            "EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = {$alias}.id AND ta.user_id = ?)",
+            "{$alias}.assignees_json LIKE ?",
+            "{$alias}.observers_json LIKE ?"
+        ];
+        if ($includeHandledProjects && $db) {
+            $handledPids = getUserHandledProjectIds($db, $uid);
+            if (!empty($handledPids)) {
+                $inPids = implode(',', array_map('intval', $handledPids));
+                $clauses[] = "{$alias}.project_id IN ({$inPids})";
+            }
+        }
+        return "(" . implode(" OR ", $clauses) . ")";
     }
 }
 
@@ -375,7 +580,11 @@ try {
             }
 
             try {
-                $db->exec("CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) UNIQUE NOT NULL, created_by INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                if (defined('DB_TYPE') && DB_TYPE === 'mysql') {
+                    $db->exec("CREATE TABLE IF NOT EXISTS departments (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE NOT NULL, created_by INT DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                } else {
+                    $db->exec("CREATE TABLE IF NOT EXISTS departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(100) UNIQUE NOT NULL, created_by INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+                }
                 $stmtIns = $db->prepare("INSERT INTO departments (name, created_by) VALUES (?, ?)");
                 $stmtIns->execute([$deptName, $currentUser['id']]);
                 logActivity($currentUser['id'], 'user-management', 'CREATE_DEPARTMENT', 'departments', $db->lastInsertId(), "Created department '{$deptName}'");
@@ -1060,6 +1269,557 @@ try {
                 'user_id' => $targetUserId,
                 'message' => "User account '@{$targetUser['username']}' deleted successfully."
             ]);
+            break;
+
+
+        // =========================================================================
+        // 🎬 SHOOT SCHEDULE API
+        // =========================================================================
+        case 'get_shoot_schedules':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+            $isSuperAdmin = isSuperAdminUser($user);
+
+            $search = trim($_GET['search'] ?? '');
+            $statusFilter = trim($_GET['status'] ?? '');
+            $typeFilter = trim($_GET['shoot_type'] ?? '');
+            $venueStatusFilter = trim($_GET['venue_blocked_status'] ?? '');
+
+            $sql = "SELECT s.*, u.full_name as created_by_name, c.contact_person, c.phone as client_phone, c.email as client_email
+                    FROM shoot_schedules s
+                    LEFT JOIN users u ON s.created_by = u.id
+                    LEFT JOIN clients c ON s.client_id = c.id";
+
+            $whereClauses = [];
+            $params = [];
+
+            if (!$isSuperAdmin) {
+                // Regular employees can only see shoots they are assigned to
+                $sql .= " INNER JOIN shoot_assignments sa ON sa.shoot_id = s.id AND sa.user_id = ?";
+                $params[] = $user['id'];
+            }
+
+            if (!empty($search)) {
+                $whereClauses[] = "(s.client_name LIKE ? OR s.shoot_venue LIKE ? OR s.shoot_type LIKE ? OR s.notes LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam]);
+            }
+
+            if (!empty($statusFilter)) {
+                $whereClauses[] = "s.status = ?";
+                $params[] = $statusFilter;
+            }
+
+            if (!empty($typeFilter)) {
+                $whereClauses[] = "s.shoot_type = ?";
+                $params[] = $typeFilter;
+            }
+
+            if (!empty($venueStatusFilter)) {
+                $whereClauses[] = "s.venue_blocked_status = ?";
+                $params[] = $venueStatusFilter;
+            }
+
+            if (!empty($whereClauses)) {
+                $sql .= " WHERE " . implode(" AND ", $whereClauses);
+            }
+
+            $sql .= " ORDER BY s.shoot_date ASC";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $shoots = $stmt->fetchAll();
+
+            // Attach assigned employee information and time calculations
+            $stmtAssignees = $db->prepare("SELECT u.id, u.full_name, u.username, u.department, r.name as role_name 
+                                           FROM shoot_assignments sa 
+                                           JOIN users u ON sa.user_id = u.id 
+                                           JOIN roles r ON u.role_id = r.id 
+                                           WHERE sa.shoot_id = ? 
+                                           ORDER BY u.full_name ASC");
+
+            $nowTs = time();
+            $stats = [
+                'total_shoots' => 0,
+                'upcoming_shoots' => 0,
+                'scripts_approved_count' => 0,
+                'venue_blocked_yes' => 0,
+                'completed_shoots' => 0
+            ];
+
+            foreach ($shoots as &$s) {
+                $stmtAssignees->execute([$s['id']]);
+                $s['assigned_employees'] = $stmtAssignees->fetchAll();
+
+                $shootTs = strtotime($s['shoot_date']);
+                $s['shoot_timestamp'] = $shootTs;
+                $s['is_upcoming'] = ($shootTs >= $nowTs);
+                $s['formatted_date'] = date('D, M d, Y', $shootTs);
+                $s['formatted_time'] = date('h:i A', $shootTs);
+
+                $stats['total_shoots']++;
+                if ($s['is_upcoming'] && $s['status'] !== 'Cancelled') $stats['upcoming_shoots']++;
+                if (strcasecmp($s['scripts_approved'] ?? '', 'Yes') === 0) $stats['scripts_approved_count']++;
+                if (strcasecmp($s['venue_blocked_status'] ?? '', 'Yes') === 0) $stats['venue_blocked_yes']++;
+                if (strcasecmp($s['status'] ?? '', 'Completed') === 0) $stats['completed_shoots']++;
+            }
+            unset($s);
+
+            echo json_encode([
+                'success' => true,
+                'is_super_admin' => $isSuperAdmin,
+                'shoots' => $shoots,
+                'stats' => $stats
+            ]);
+            break;
+
+        case 'save_shoot_schedule':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+
+            if (!isSuperAdminUser($user)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can schedule shoots and assign employees.']);
+                exit;
+            }
+
+            $shootId = intval($input['id'] ?? 0);
+            $clientId = !empty($input['client_id']) ? intval($input['client_id']) : null;
+            $clientName = trim($input['client_name'] ?? '');
+            $shootDate = trim($input['shoot_date'] ?? '');
+            $videosPlanned = max(1, intval($input['videos_planned'] ?? 1));
+            $scriptsApproved = trim($input['scripts_approved'] ?? 'Pending');
+            $shootVenue = trim($input['shoot_venue'] ?? '');
+            $venueBlockedStatus = trim($input['venue_blocked_status'] ?? 'Pending from Venue Side');
+            $clientParticipants = max(0, intval($input['client_participants_count'] ?? 0));
+            $shootType = trim($input['shoot_type'] ?? 'Client Informative Video');
+            $status = trim($input['status'] ?? 'Scheduled');
+            $notes = trim($input['notes'] ?? '');
+            $assignedIds = isset($input['assigned_employee_ids']) ? (array)$input['assigned_employee_ids'] : [];
+
+            if (empty($clientName) || empty($shootDate) || empty($shootType)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Client Name, Shoot Date, and Shoot Type are required.']);
+                exit;
+            }
+
+            // Standardize shoot date format
+            $shootDateFormatted = date('Y-m-d H:i:s', strtotime($shootDate));
+
+            if ($shootId > 0) {
+                // Update
+                $stmt = $db->prepare("UPDATE shoot_schedules SET
+                    client_id = ?,
+                    client_name = ?,
+                    shoot_date = ?,
+                    videos_planned = ?,
+                    scripts_approved = ?,
+                    shoot_venue = ?,
+                    venue_blocked_status = ?,
+                    client_participants_count = ?,
+                    shoot_type = ?,
+                    status = ?,
+                    notes = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?");
+                $stmt->execute([
+                    $clientId, $clientName, $shootDateFormatted, $videosPlanned, $scriptsApproved,
+                    $shootVenue, $venueBlockedStatus, $clientParticipants, $shootType, $status, $notes, $shootId
+                ]);
+                $actionType = 'UPDATE_SHOOT_SCHEDULE';
+                $logMsg = "Updated shoot schedule for client '{$clientName}' ({$shootDateFormatted})";
+            } else {
+                // Insert
+                $stmt = $db->prepare("INSERT INTO shoot_schedules (
+                    client_id, client_name, shoot_date, videos_planned, scripts_approved,
+                    shoot_venue, venue_blocked_status, client_participants_count, shoot_type,
+                    status, notes, created_by, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+                $stmt->execute([
+                    $clientId, $clientName, $shootDateFormatted, $videosPlanned, $scriptsApproved,
+                    $shootVenue, $venueBlockedStatus, $clientParticipants, $shootType,
+                    $status, $notes, $user['id']
+                ]);
+                $shootId = intval($db->lastInsertId());
+                $actionType = 'CREATE_SHOOT_SCHEDULE';
+                $logMsg = "Scheduled new shoot for client '{$clientName}' on {$shootDateFormatted}";
+            }
+
+            // Sync assigned employees
+            syncShootAssignments($db, $shootId, $assignedIds);
+
+            // Notify assigned employees
+            if (!empty($assignedIds)) {
+                notifyShootAssignees($db, $shootId, $clientName, $shootDateFormatted, $shootVenue, $assignedIds, $user);
+            }
+
+            logActivity($user['id'], 'operations', $actionType, 'shoot_schedules', $shootId, $logMsg);
+
+            echo json_encode([
+                'success' => true,
+                'shoot_id' => $shootId,
+                'message' => "Shoot schedule for '{$clientName}' saved successfully!"
+            ]);
+            break;
+
+        case 'delete_shoot_schedule':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+
+            if (!isSuperAdminUser($user)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can delete shoot schedules.']);
+                exit;
+            }
+
+            $shootId = intval($input['id'] ?? 0);
+            if ($shootId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid shoot ID.']);
+                exit;
+            }
+
+            $stmtGet = $db->prepare("SELECT client_name, shoot_date FROM shoot_schedules WHERE id = ?");
+            $stmtGet->execute([$shootId]);
+            $shoot = $stmtGet->fetch();
+
+            if ($shoot) {
+                $db->prepare("DELETE FROM shoot_assignments WHERE shoot_id = ?")->execute([$shootId]);
+                $db->prepare("DELETE FROM shoot_schedules WHERE id = ?")->execute([$shootId]);
+                logActivity($user['id'], 'operations', 'DELETE_SHOOT_SCHEDULE', 'shoot_schedules', $shootId, "Deleted shoot schedule for '{$shoot['client_name']}'");
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Shoot schedule deleted successfully.']);
+            break;
+
+        case 'update_shoot_status':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+            $shootId = intval($input['id'] ?? 0);
+
+            if ($shootId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid shoot ID.']);
+                exit;
+            }
+
+            // Permission check: Super Admin or assigned to this shoot
+            $isSuperAdmin = isSuperAdminUser($user);
+            if (!$isSuperAdmin) {
+                $chk = $db->prepare("SELECT 1 FROM shoot_assignments WHERE shoot_id = ? AND user_id = ?");
+                $chk->execute([$shootId, $user['id']]);
+                if (!$chk->fetchColumn()) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Access Denied: You are not assigned to this shoot.']);
+                    exit;
+                }
+            }
+
+            $fieldsToUpdate = [];
+            $params = [];
+
+            if (isset($input['status'])) {
+                $fieldsToUpdate[] = "status = ?";
+                $params[] = trim($input['status']);
+            }
+            if (isset($input['scripts_approved'])) {
+                $fieldsToUpdate[] = "scripts_approved = ?";
+                $params[] = trim($input['scripts_approved']);
+            }
+            if (isset($input['venue_blocked_status'])) {
+                $fieldsToUpdate[] = "venue_blocked_status = ?";
+                $params[] = trim($input['venue_blocked_status']);
+            }
+            if (isset($input['notes'])) {
+                $fieldsToUpdate[] = "notes = ?";
+                $params[] = trim($input['notes']);
+            }
+
+            if (!empty($fieldsToUpdate)) {
+                $fieldsToUpdate[] = "updated_at = CURRENT_TIMESTAMP";
+                $params[] = $shootId;
+                $sql = "UPDATE shoot_schedules SET " . implode(", ", $fieldsToUpdate) . " WHERE id = ?";
+                $db->prepare($sql)->execute($params);
+                logActivity($user['id'], 'operations', 'UPDATE_SHOOT_STATUS', 'shoot_schedules', $shootId, "Updated status/progress for shoot #{$shootId}");
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Shoot details updated successfully!']);
+            break;
+
+
+        // =========================================================================
+        // 🌐 DOMAIN & SERVER RENEWAL API
+        // =========================================================================
+        case 'get_domain_renewals':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+            $isSuperAdmin = isSuperAdminUser($user);
+
+            $search = trim($_GET['search'] ?? '');
+            $statusFilter = trim($_GET['renewal_status'] ?? '');
+            $expiringFilter = trim($_GET['expiring_window'] ?? ''); // '30_days', '60_days', 'expired'
+
+            $sql = "SELECT r.*, u.full_name as created_by_name, c.company_name as client_company, c.contact_person as client_contact_person
+                    FROM domain_server_renewals r
+                    LEFT JOIN users u ON r.created_by = u.id
+                    LEFT JOIN clients c ON r.client_id = c.id";
+
+            $whereClauses = [];
+            $params = [];
+
+            if (!$isSuperAdmin) {
+                // Regular employees can only see renewals they are assigned to
+                $sql .= " INNER JOIN renewal_assignments ra ON ra.renewal_id = r.id AND ra.user_id = ?";
+                $params[] = $user['id'];
+            }
+
+            if (!empty($search)) {
+                $whereClauses[] = "(r.domain_name LIKE ? OR r.client_name LIKE ? OR r.contact_number LIKE ? OR r.hosting_provider LIKE ? OR r.notes LIKE ?)";
+                $searchParam = "%{$search}%";
+                $params = array_merge($params, [$searchParam, $searchParam, $searchParam, $searchParam, $searchParam]);
+            }
+
+            if (!empty($statusFilter)) {
+                $whereClauses[] = "r.renewal_status = ?";
+                $params[] = $statusFilter;
+            }
+
+            if (!empty($whereClauses)) {
+                $sql .= " WHERE " . implode(" AND ", $whereClauses);
+            }
+
+            $sql .= " ORDER BY COALESCE(r.domain_expiry, r.server_expiry) ASC";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $renewals = $stmt->fetchAll();
+
+            // Attach assigned employee information and renewal calculations
+            $stmtAssignees = $db->prepare("SELECT u.id, u.full_name, u.username, u.department, r.name as role_name 
+                                           FROM renewal_assignments ra 
+                                           JOIN users u ON ra.user_id = u.id 
+                                           JOIN roles r ON u.role_id = r.id 
+                                           WHERE ra.renewal_id = ? 
+                                           ORDER BY u.full_name ASC");
+
+            $nowTs = time();
+            $stats = [
+                'total_records' => 0,
+                'domains_expiring_soon' => 0,
+                'servers_expiring_soon' => 0,
+                'expired_count' => 0,
+                'total_domain_charges' => 0.0,
+                'total_server_charges' => 0.0
+            ];
+
+            $filteredRenewals = [];
+
+            foreach ($renewals as &$r) {
+                $stmtAssignees->execute([$r['id']]);
+                $r['assigned_employees'] = $stmtAssignees->fetchAll();
+
+                $domExpiryTs = !empty($r['domain_expiry']) ? strtotime($r['domain_expiry']) : null;
+                $srvExpiryTs = !empty($r['server_expiry']) ? strtotime($r['server_expiry']) : null;
+
+                $r['domain_days_left'] = $domExpiryTs ? (int)ceil(($domExpiryTs - $nowTs) / 86400) : null;
+                $r['server_days_left'] = $srvExpiryTs ? (int)ceil(($srvExpiryTs - $nowTs) / 86400) : null;
+
+                $r['formatted_domain_expiry'] = $domExpiryTs ? date('M d, Y', $domExpiryTs) : '—';
+                $r['formatted_server_expiry'] = $srvExpiryTs ? date('M d, Y', $srvExpiryTs) : '—';
+
+                $stats['total_records']++;
+                $stats['total_domain_charges'] += floatval($r['domain_charges'] ?? 0);
+                $stats['total_server_charges'] += floatval($r['server_charges'] ?? 0);
+
+                $isDomExpiringSoon = ($r['domain_days_left'] !== null && $r['domain_days_left'] >= 0 && $r['domain_days_left'] <= 30);
+                $isSrvExpiringSoon = ($r['server_days_left'] !== null && $r['server_days_left'] >= 0 && $r['server_days_left'] <= 30);
+                $isExpired = ($r['domain_days_left'] !== null && $r['domain_days_left'] < 0) || ($r['server_days_left'] !== null && $r['server_days_left'] < 0);
+
+                if ($isDomExpiringSoon) $stats['domains_expiring_soon']++;
+                if ($isSrvExpiringSoon) $stats['servers_expiring_soon']++;
+                if ($isExpired) $stats['expired_count']++;
+
+                // Optional window filter
+                if ($expiringFilter === '30_days' && !($isDomExpiringSoon || $isSrvExpiringSoon)) continue;
+                if ($expiringFilter === 'expired' && !$isExpired) continue;
+
+                $filteredRenewals[] = $r;
+            }
+            unset($r);
+
+            echo json_encode([
+                'success' => true,
+                'is_super_admin' => $isSuperAdmin,
+                'renewals' => $filteredRenewals,
+                'stats' => $stats
+            ]);
+            break;
+
+        case 'save_domain_renewal':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+
+            if (!isSuperAdminUser($user)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can manage domain & server renewals.']);
+                exit;
+            }
+
+            $renewalId = intval($input['id'] ?? 0);
+            $clientId = !empty($input['client_id']) ? intval($input['client_id']) : null;
+            $clientName = trim($input['client_name'] ?? '');
+            $contactNumber = trim($input['contact_number'] ?? '');
+            $domainName = trim($input['domain_name'] ?? '');
+            $domainExpiry = !empty($input['domain_expiry']) ? date('Y-m-d', strtotime($input['domain_expiry'])) : null;
+            $domainCharges = floatval($input['domain_charges'] ?? 0);
+            $serverExpiry = !empty($input['server_expiry']) ? date('Y-m-d', strtotime($input['server_expiry'])) : null;
+            $serverCharges = floatval($input['server_charges'] ?? 0);
+            $renewalStatus = trim($input['renewal_status'] ?? 'Active');
+            $hostingProvider = trim($input['hosting_provider'] ?? '');
+            $notes = trim($input['notes'] ?? '');
+            $assignedIds = isset($input['assigned_employee_ids']) ? (array)$input['assigned_employee_ids'] : [];
+
+            if (empty($domainName) || empty($clientName)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Domain Name and Client Name are required.']);
+                exit;
+            }
+
+            if ($renewalId > 0) {
+                // Update
+                $stmt = $db->prepare("UPDATE domain_server_renewals SET
+                    client_id = ?,
+                    client_name = ?,
+                    contact_number = ?,
+                    domain_name = ?,
+                    domain_expiry = ?,
+                    domain_charges = ?,
+                    server_expiry = ?,
+                    server_charges = ?,
+                    renewal_status = ?,
+                    hosting_provider = ?,
+                    notes = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?");
+                $stmt->execute([
+                    $clientId, $clientName, $contactNumber, $domainName,
+                    $domainExpiry, $domainCharges, $serverExpiry, $serverCharges,
+                    $renewalStatus, $hostingProvider, $notes, $renewalId
+                ]);
+                $actionType = 'UPDATE_DOMAIN_RENEWAL';
+                $logMsg = "Updated domain & server renewal for '{$domainName}' ({$clientName})";
+            } else {
+                // Insert
+                $stmt = $db->prepare("INSERT INTO domain_server_renewals (
+                    client_id, client_name, contact_number, domain_name,
+                    domain_expiry, domain_charges, server_expiry, server_charges,
+                    renewal_status, hosting_provider, notes, created_by, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+                $stmt->execute([
+                    $clientId, $clientName, $contactNumber, $domainName,
+                    $domainExpiry, $domainCharges, $serverExpiry, $serverCharges,
+                    $renewalStatus, $hostingProvider, $notes, $user['id']
+                ]);
+                $renewalId = intval($db->lastInsertId());
+                $actionType = 'CREATE_DOMAIN_RENEWAL';
+                $logMsg = "Added domain & server renewal tracking for '{$domainName}' ({$clientName})";
+            }
+
+            // Sync assigned employees
+            syncRenewalAssignments($db, $renewalId, $assignedIds);
+
+            // Notify assigned employees
+            if (!empty($assignedIds)) {
+                notifyRenewalAssignees($db, $renewalId, $domainName, $clientName, $domainExpiry, $assignedIds, $user);
+            }
+
+            logActivity($user['id'], 'operations', $actionType, 'domain_server_renewals', $renewalId, $logMsg);
+
+            echo json_encode([
+                'success' => true,
+                'renewal_id' => $renewalId,
+                'message' => "Renewal record for '{$domainName}' saved successfully!"
+            ]);
+            break;
+
+        case 'delete_domain_renewal':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+
+            if (!isSuperAdminUser($user)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can delete renewal records.']);
+                exit;
+            }
+
+            $renewalId = intval($input['id'] ?? 0);
+            if ($renewalId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid renewal ID.']);
+                exit;
+            }
+
+            $stmtGet = $db->prepare("SELECT domain_name, client_name FROM domain_server_renewals WHERE id = ?");
+            $stmtGet->execute([$renewalId]);
+            $ren = $stmtGet->fetch();
+
+            if ($ren) {
+                $db->prepare("DELETE FROM renewal_assignments WHERE renewal_id = ?")->execute([$renewalId]);
+                $db->prepare("DELETE FROM domain_server_renewals WHERE id = ?")->execute([$renewalId]);
+                logActivity($user['id'], 'operations', 'DELETE_DOMAIN_RENEWAL', 'domain_server_renewals', $renewalId, "Deleted renewal record for '{$ren['domain_name']}'");
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Renewal record deleted successfully.']);
+            break;
+
+        case 'update_domain_renewal_status':
+            checkAuth();
+            ensureOperationsSchema($db);
+            $user = getCurrentUser();
+            $renewalId = intval($input['id'] ?? 0);
+
+            if ($renewalId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid renewal ID.']);
+                exit;
+            }
+
+            // Permission check: Super Admin or assigned to this renewal
+            $isSuperAdmin = isSuperAdminUser($user);
+            if (!$isSuperAdmin) {
+                $chk = $db->prepare("SELECT 1 FROM renewal_assignments WHERE renewal_id = ? AND user_id = ?");
+                $chk->execute([$renewalId, $user['id']]);
+                if (!$chk->fetchColumn()) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Access Denied: You are not assigned to this renewal record.']);
+                    exit;
+                }
+            }
+
+            $fieldsToUpdate = [];
+            $params = [];
+
+            if (isset($input['renewal_status'])) {
+                $fieldsToUpdate[] = "renewal_status = ?";
+                $params[] = trim($input['renewal_status']);
+            }
+            if (isset($input['notes'])) {
+                $fieldsToUpdate[] = "notes = ?";
+                $params[] = trim($input['notes']);
+            }
+
+            if (!empty($fieldsToUpdate)) {
+                $fieldsToUpdate[] = "updated_at = CURRENT_TIMESTAMP";
+                $params[] = $renewalId;
+                $sql = "UPDATE domain_server_renewals SET " . implode(", ", $fieldsToUpdate) . " WHERE id = ?";
+                $db->prepare($sql)->execute($params);
+                logActivity($user['id'], 'operations', 'UPDATE_RENEWAL_STATUS', 'domain_server_renewals', $renewalId, "Updated status/notes for renewal #{$renewalId}");
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Renewal status updated successfully!']);
             break;
 
 
@@ -1999,12 +2759,26 @@ try {
             }
 
             try {
-                // Ensure projects has department column
+                // Ensure projects has department & observers_json column
                 try {
                     $db->exec("ALTER TABLE projects ADD COLUMN department VARCHAR(100) DEFAULT 'Development'");
                 } catch (Exception $eCol) {}
+                $defaultProjObsIds = getDefaultProjectObserverIds($db, $teamLeadId);
 
-                $stmtProj = $db->prepare("INSERT INTO projects (client_id, service_id, project_name, description, priority, status, team_lead_id, department, deadline, created_by) VALUES (?, ?, ?, ?, ?, 'In Progress', ?, ?, ?, ?)");
+                // Resolve departments list from features if multiple departments are handed over
+                $features = $input['features'] ?? [];
+                $selectedDeptNames = [];
+                if (is_array($features) && !empty($features)) {
+                    foreach ($features as $fItem) {
+                        $dn = trim($fItem['department'] ?? '');
+                        if ($dn !== '' && strtolower($dn) !== 'sales' && !in_array($dn, $selectedDeptNames, true)) {
+                            $selectedDeptNames[] = $dn;
+                        }
+                    }
+                }
+                $projectDeptStr = !empty($selectedDeptNames) ? implode(', ', $selectedDeptNames) : $primaryDept;
+
+                $stmtProj = $db->prepare("INSERT INTO projects (client_id, service_id, project_name, description, priority, status, team_lead_id, observers_json, department, deadline, created_by) VALUES (?, ?, ?, ?, ?, 'In Progress', ?, ?, ?, ?, ?)");
                 $stmtProj->execute([
                     $doc['client_id'],
                     $doc['service_id'],
@@ -2012,7 +2786,8 @@ try {
                     $description,
                     $priority,
                     $teamLeadId,
-                    $primaryDept,
+                    json_encode($defaultProjObsIds),
+                    $projectDeptStr,
                     $deadline,
                     $user['id']
                 ]);
@@ -2024,13 +2799,16 @@ try {
                 $stmtCli = $db->prepare("UPDATE clients SET status = 'Approved / Active' WHERE id = ?");
                 $stmtCli->execute([$doc['client_id']]);
 
-                // Create Work Order Tasks for each feature / deliverable assigned to its respective department
-                $features = $input['features'] ?? [];
+                // Create Work Order Tasks for each department with its multiple selected assignees
                 if (!is_array($features) || empty($features)) {
+                    $fallbackAssignees = !empty($input['assignees']) && is_array($input['assignees'])
+                        ? array_values(array_unique(array_filter(array_map('intval', $input['assignees']))))
+                        : [$teamLeadId];
                     $features = [[
                         'title' => "Handover Execution: " . $doc['title'],
                         'department' => $primaryDept,
-                        'assigned_to' => $teamLeadId,
+                        'assigned_to' => $fallbackAssignees[0] ?? $teamLeadId,
+                        'assignees' => $fallbackAssignees,
                         'priority' => $priority,
                         'sla_hours' => 48,
                         'notes' => $description
@@ -2039,11 +2817,12 @@ try {
 
                 $tasksCreated = 0;
                 $assignedDepts = [];
+                $allAssignedUsersToNotify = [];
 
                 foreach ($features as $idx => $f) {
                     $fTitle = trim($f['title'] ?? '');
                     if ($fTitle === '') {
-                        $fTitle = "Feature " . ($idx + 1) . ": " . $doc['title'];
+                        $fTitle = "Handover Execution: " . $doc['title'];
                     }
                     $fDept = trim($f['department'] ?? $primaryDept);
                     if (empty($fDept) || strtolower($fDept) === 'sales') {
@@ -2051,7 +2830,13 @@ try {
                     }
                     $assignedDepts[$fDept] = true;
 
-                    // Resolve assigned lead and primary assignee for this department deliverable
+                    // Resolve multiple assignees for this department
+                    $fAssignees = [];
+                    if (!empty($f['assignees']) && is_array($f['assignees'])) {
+                        $fAssignees = array_values(array_unique(array_filter(array_map('intval', $f['assignees']), function ($x) { return $x > 0; })));
+                    }
+
+                    // Resolve assigned lead for this department
                     $fTaskLeadId = intval($f['team_lead_id'] ?? ($f['assigned_to'] ?? 0));
                     if ($fTaskLeadId <= 0) {
                         $stmtLead = $db->prepare("
@@ -2061,32 +2846,46 @@ try {
                             ORDER BY u.role_id ASC LIMIT 1
                         ");
                         $stmtLead->execute([$fDept]);
-                        $fTaskLeadId = $stmtLead->fetchColumn();
+                        $fTaskLeadId = intval($stmtLead->fetchColumn() ?: 0);
 
-                        if (!$fTaskLeadId) {
-                            $stmtDeptUser = $db->prepare("SELECT id FROM users WHERE department = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
-                            $stmtDeptUser->execute([$fDept]);
-                            $fTaskLeadId = $stmtDeptUser->fetchColumn();
+                        if ($fTaskLeadId <= 0 && !empty($fAssignees)) {
+                            $fTaskLeadId = $fAssignees[0];
                         }
 
-                        if (!$fTaskLeadId) {
+                        if ($fTaskLeadId <= 0) {
+                            $stmtDeptUser = $db->prepare("SELECT id FROM users WHERE department = ? AND is_active = 1 ORDER BY id ASC LIMIT 1");
+                            $stmtDeptUser->execute([$fDept]);
+                            $fTaskLeadId = intval($stmtDeptUser->fetchColumn() ?: 0);
+                        }
+
+                        if ($fTaskLeadId <= 0) {
                             $fTaskLeadId = $teamLeadId;
                         }
                     }
 
-                    $fPrimaryAssignedTo = $fTaskLeadId;
-                    $fAssignees = [$fPrimaryAssignedTo];
+                    if (empty($fAssignees)) {
+                        $fAssignees = [$fTaskLeadId];
+                    }
+                    $fPrimaryAssignedTo = $fAssignees[0];
                     $fAssigneesJson = json_encode($fAssignees);
 
-                    // Resolve observers (watchers)
-                    $fObservers = [];
+                    foreach ($fAssignees as $aUid) {
+                        $allAssignedUsersToNotify[$aUid] = true;
+                    }
+                    if ($fTaskLeadId > 0) {
+                        $allAssignedUsersToNotify[$fTaskLeadId] = true;
+                    }
+
+                    // Resolve observers (watchers): include default Lead, Super Admin, and CRM observers
+                    $fObservers = getProjectObserverIds($db, $projectId, $fTaskLeadId);
                     if (!empty($f['observers']) && is_array($f['observers'])) {
-                        $fObservers = array_values(array_filter(array_map('intval', $f['observers'])));
+                        $fObservers = array_merge($fObservers, array_map('intval', $f['observers']));
                     }
                     // Current creator (e.g. Sales user) is automatically added as an observer
                     if (!in_array($user['id'], $fObservers)) {
                         $fObservers[] = $user['id'];
                     }
+                    $fObservers = array_values(array_unique(array_filter($fObservers, function ($x) { return $x > 0; })));
                     $fObserversJson = json_encode($fObservers);
 
                     $fPriority = !empty($f['priority']) ? $f['priority'] : $priority;
@@ -2157,20 +2956,11 @@ try {
                     // Ignore optional notification errors
                 }
 
-                // Notify Team Leads & Super Admins about the new project handover
+                // Notify Assigned Team Members, Department Leads & Super Admins about the new project handover
                 try {
-                    $db->exec("CREATE TABLE IF NOT EXISTS user_notifications (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER NOT NULL,
-                        title VARCHAR(255) NOT NULL,
-                        message TEXT NOT NULL,
-                        type VARCHAR(50) DEFAULT 'project_handover',
-                        link_url VARCHAR(255) DEFAULT '',
-                        is_read INTEGER DEFAULT 0,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )");
+                    ensureUserNotificationsTable($db);
 
-                    $leadsToNotify = [];
+                    $leadsToNotify = $allAssignedUsersToNotify;
                     if ($teamLeadId > 0) {
                         $leadsToNotify[$teamLeadId] = true;
                     }
@@ -2178,6 +2968,11 @@ try {
                         $fLeadId = intval($feat['team_lead_id'] ?? ($feat['assigned_to'] ?? 0));
                         if ($fLeadId > 0) {
                             $leadsToNotify[$fLeadId] = true;
+                        }
+                        if (!empty($feat['assignees']) && is_array($feat['assignees'])) {
+                            foreach ($feat['assignees'] as $aId) {
+                                if (intval($aId) > 0) $leadsToNotify[intval($aId)] = true;
+                            }
                         }
                     }
                     // Also notify Super Admins
@@ -2188,9 +2983,10 @@ try {
                         }
                     }
 
+                    $deptListForNotif = implode(', ', array_keys($assignedDepts));
                     $stmtLeadNotif = $db->prepare("INSERT INTO user_notifications (user_id, title, message, type, link_url, is_read, created_at) VALUES (?, ?, ?, 'project_handover', ?, 0, CURRENT_TIMESTAMP)");
                     $notifTitle = "🚀 New Project Handover: {$projectName}";
-                    $notifMsg = "Sales rep {$user['full_name']} handed over document #{$doc['document_number']} ({$doc['company_name']}) with {$tasksCreated} feature deliverable(s). Click to review tasks, assign team members, and add observers.";
+                    $notifMsg = "Sales rep {$user['full_name']} handed over document #{$doc['document_number']} ({$doc['company_name']}) to {$deptListForNotif}. Click to view project & assigned work.";
                     $notifLink = "projects.php?project_id={$projectId}";
 
                     foreach (array_keys($leadsToNotify) as $targetLeadId) {
@@ -2199,9 +2995,10 @@ try {
                 } catch (Exception $eLeadNotif) {}
 
                 $deptListStr = implode(', ', array_keys($assignedDepts));
-                logActivity($user['id'], 'template-generator', 'HANDOVER_TO_DEPARTMENTS', 'projects', $projectId, "Handed over document #{$doc['document_number']} with {$tasksCreated} features to departments ({$deptListStr})");
+                $totalUniqueAssignees = count($allAssignedUsersToNotify);
+                logActivity($user['id'], 'template-generator', 'HANDOVER_TO_DEPARTMENTS', 'projects', $projectId, "Handed over document #{$doc['document_number']} to {$totalUniqueAssignees} assignee(s) across department(s): {$deptListStr}");
 
-                $msg = "Client approval confirmed! Project #{$projectId} created for {$doc['company_name']}. Successfully handed over {$tasksCreated} feature deliverable(s) to department(s): {$deptListStr}.";
+                $msg = "Client approval confirmed! Project #{$projectId} created for {$doc['company_name']}. Successfully handed over to {$totalUniqueAssignees} assignee(s) across department(s): {$deptListStr}.";
                 if ($clientUser) {
                     if ($clientUser['created']) {
                         $msg .= " Client Portal user created (@{$clientUser['username']}, Temp Password: {$clientUser['temp_password']}).";
@@ -2228,13 +3025,6 @@ try {
         case 'reassign_task':
             checkAuth('task-management');
             $currentUser = getCurrentUser();
-
-            // Only Team Lead, Super Admin, Admin, and Manager can reassign tasks and manage observers
-            if (!isLeadOrAdmin()) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads and Super Admins can assign tasks and manage observers.']);
-                exit;
-            }
 
             $taskId = intval($input['task_id'] ?? 0);
             $assignedTo = intval($input['assigned_to'] ?? 0);
@@ -2267,6 +3057,32 @@ try {
             if (!$task) {
                 echo json_encode(['success' => false, 'message' => 'Task not found.']);
                 exit;
+            }
+
+            // Only Team Lead, Super Admin, or Project Handler for this project can reassign tasks
+            if (!canManageProject($db, $task['project_id'], $currentUser['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads, Super Admins, or Project Handlers can assign tasks and manage observers.']);
+                exit;
+            }
+
+            if (array_key_exists('project_handlers', $input)) {
+                if (!isLeadOrAdmin()) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads or Super Admins can add or change Project Handlers.']);
+                    exit;
+                }
+                if (is_array($input['project_handlers']) && !empty($task['project_id'])) {
+                    $prevH = getProjectHandlerIds($db, $task['project_id']);
+                    $newH = syncProjectHandlers($db, $task['project_id'], $input['project_handlers']);
+                    $addedH = array_values(array_diff($newH, $prevH));
+                    if (!empty($addedH)) {
+                        $stPnH = $db->prepare("SELECT project_name FROM projects WHERE id = ?");
+                        $stPnH->execute([$task['project_id']]);
+                        $pnH = (string)($stPnH->fetchColumn() ?: '');
+                        notifyProjectHandlers($db, $task['project_id'], $pnH, $addedH, $currentUser);
+                    }
+                }
             }
 
             $stmtU = $db->prepare("SELECT full_name, username FROM users WHERE id = ?");
@@ -2429,6 +3245,8 @@ try {
         // --- MODULE 4 API ---
         case 'get_projects':
             checkAuth('task-management');
+            $curUser = getCurrentUser();
+            $curUid = intval($curUser['id'] ?? 0);
             $isCurrent = isset($_GET['is_current']) && $_GET['is_current'] !== '' ? intval($_GET['is_current']) : null;
             $deptFilter = trim($_GET['department'] ?? '');
             $clientIdFilter = intval($_GET['client_id'] ?? 0);
@@ -2459,6 +3277,8 @@ try {
                     (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='COMPLETED' AND t.is_deleted=0) as completed_tasks,
                     (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status IN ('IN PROGRESS', 'UNDER REVIEW') AND t.is_deleted=0) as in_progress_tasks,
                     (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='PENDING' AND t.is_deleted=0) as pending_tasks,
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='SENT FOR CLIENT APPROVAL' AND t.is_deleted=0) as awaiting_client_approval_tasks,
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND COALESCE(t.parent_task_id, 0) > 0 AND t.is_deleted=0) as subtasks_count,
                     (SELECT COUNT(*) FROM project_competitors pc WHERE pc.project_id = p.id) as competitors_count
                     FROM projects p
                     JOIN clients c ON p.client_id = c.id
@@ -2468,7 +3288,38 @@ try {
                     ORDER BY COALESCE(p.is_current, 1) DESC, p.id DESC";
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
-            echo json_encode(['success' => true, 'projects' => $stmt->fetchAll()]);
+            $projectsList = $stmt->fetchAll();
+
+            // Resolve handlers for each project
+            $allStaffMap = [];
+            $stStaff = $db->query("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id");
+            if ($stStaff) {
+                foreach ($stStaff->fetchAll() as $su) {
+                    $allStaffMap[intval($su['id'])] = $su;
+                }
+            }
+            foreach ($projectsList as &$projRow) {
+                $hIds = getProjectHandlerIds($db, $projRow['id']);
+                $projRow['handler_ids'] = $hIds;
+                $projRow['handlers'] = array_values(array_filter(array_map(function ($hid) use ($allStaffMap) {
+                    return $allStaffMap[$hid] ?? null;
+                }, $hIds)));
+                $obsIds = getProjectObserverIds($db, $projRow['id'], $projRow['team_lead_id'] ?? 0);
+                $projRow['observer_ids'] = $obsIds;
+                $projRow['observers'] = array_values(array_filter(array_map(function ($oid) use ($allStaffMap) {
+                    return $allStaffMap[$oid] ?? null;
+                }, $obsIds)));
+                $workIds = getProjectWorkingEmployeeIds($db, $projRow['id']);
+                $projRow['working_employee_ids'] = $workIds;
+                $projRow['working_employees'] = array_values(array_filter(array_map(function ($wid) use ($allStaffMap) {
+                    return $allStaffMap[$wid] ?? null;
+                }, $workIds)));
+                $projRow['is_working_member'] = in_array($curUid, $workIds, true);
+                $projRow['is_handler'] = in_array($curUid, $hIds, true);
+                $projRow['can_manage_project'] = isLeadOrAdmin() || $projRow['is_handler'];
+            }
+
+            echo json_encode(['success' => true, 'projects' => $projectsList]);
             break;
 
         case 'get_project_details':
@@ -2480,16 +3331,19 @@ try {
             }
 
             $stmtP = $db->prepare("SELECT p.*, c.company_name, c.contact_person, c.email as client_email, c.phone as client_phone,
-                                   u.full_name as team_lead_name, cb.full_name as created_by_name,
+                                   u.full_name as team_lead_name, cb.full_name as created_by_name, ca.full_name as client_approved_by_name,
                                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.is_deleted=0) as total_tasks,
                                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='COMPLETED' AND t.is_deleted=0) as completed_tasks,
                                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='IN PROGRESS' AND t.is_deleted=0) as in_progress_tasks,
                                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='PENDING' AND t.is_deleted=0) as pending_tasks,
-                                   (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='UNDER REVIEW' AND t.is_deleted=0) as under_review_tasks
+                                   (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='UNDER REVIEW' AND t.is_deleted=0) as under_review_tasks,
+                                   (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status='SENT FOR CLIENT APPROVAL' AND t.is_deleted=0) as awaiting_client_approval_tasks,
+                                   (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND COALESCE(t.parent_task_id, 0) > 0 AND t.is_deleted=0) as subtasks_count
                                    FROM projects p
                                    JOIN clients c ON p.client_id = c.id
                                    LEFT JOIN users u ON p.team_lead_id = u.id
                                    LEFT JOIN users cb ON p.created_by = cb.id
+                                   LEFT JOIN users ca ON p.client_approved_by = ca.id
                                    WHERE p.id = ?");
             $stmtP->execute([$projectId]);
             $project = $stmtP->fetch();
@@ -2498,22 +3352,61 @@ try {
                 exit;
             }
 
+            $pdUser = getCurrentUser();
+            $pdUid = intval($pdUser['id'] ?? 0);
+            $handlerIds = getProjectHandlerIds($db, $projectId);
+            $handlersList = [];
+            if (!empty($handlerIds)) {
+                $ph = implode(',', array_fill(0, count($handlerIds), '?'));
+                $stH = $db->prepare("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id IN ($ph) ORDER BY u.full_name ASC");
+                $stH->execute($handlerIds);
+                $handlersList = $stH->fetchAll();
+            }
+            $project['handler_ids'] = $handlerIds;
+            $project['handlers'] = $handlersList;
+            $observerIds = getProjectObserverIds($db, $projectId, $project['team_lead_id'] ?? 0);
+            $observersList = [];
+            if (!empty($observerIds)) {
+                $phO = implode(',', array_fill(0, count($observerIds), '?'));
+                $stO = $db->prepare("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id IN ($phO) ORDER BY u.full_name ASC");
+                $stO->execute($observerIds);
+                $observersList = $stO->fetchAll();
+            }
+            $project['observer_ids'] = $observerIds;
+            $project['observers'] = $observersList;
+
+            $workingIds = getProjectWorkingEmployeeIds($db, $projectId);
+            $workingList = [];
+            if (!empty($workingIds)) {
+                $phW = implode(',', array_fill(0, count($workingIds), '?'));
+                $stW = $db->prepare("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id IN ($phW) ORDER BY u.full_name ASC");
+                $stW->execute($workingIds);
+                $workingList = $stW->fetchAll();
+            }
+            $project['working_employee_ids'] = $workingIds;
+            $project['working_employees'] = $workingList;
+            $project['is_working_member'] = in_array($pdUid, $workingIds, true);
+            $project['is_handler'] = in_array($pdUid, $handlerIds, true);
+            $canManageThisProject = canManageProject($db, $projectId, $pdUid);
+            $project['can_manage_project'] = $canManageThisProject;
+
             $stmtComp = $db->prepare("SELECT pc.*, u.full_name as added_by_name FROM project_competitors pc LEFT JOIN users u ON pc.created_by = u.id WHERE pc.project_id = ? ORDER BY pc.id ASC");
             $stmtComp->execute([$projectId]);
             $competitors = $stmtComp->fetchAll();
 
-            $stmtTasks = $db->prepare("SELECT t.*, u_assign.full_name as assigned_to_name, u_lead.full_name as team_lead_name
+            $stmtTasks = $db->prepare("SELECT t.*, u_assign.full_name as assigned_to_name, u_lead.full_name as team_lead_name,
+                                       pt.task_code as parent_task_code, pt.title as parent_task_title,
+                                       (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.is_deleted = 0) as subtasks_count
                                        FROM tasks t
                                        LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
                                        LEFT JOIN users u_lead ON t.team_lead_id = u_lead.id
+                                       LEFT JOIN tasks pt ON t.parent_task_id = pt.id
                                        WHERE t.project_id = ? AND t.is_deleted = 0
-                                       ORDER BY CASE t.priority WHEN 'Urgent' THEN 1 WHEN 'High' THEN 2 WHEN 'Medium' THEN 3 ELSE 4 END, t.id DESC");
+                                       ORDER BY COALESCE(t.parent_task_id, t.id) ASC, COALESCE(t.parent_task_id, 0) ASC, t.id ASC");
             $stmtTasks->execute([$projectId]);
             $projectTasks = $stmtTasks->fetchAll();
 
-            $pdUser = getCurrentUser();
-            if (!isLeadOrAdmin()) {
-                $pdUid = intval($pdUser['id'] ?? 0);
+            if (!$canManageThisProject) {
                 $projectTasks = array_values(array_filter($projectTasks, function ($pt) use ($pdUid, $db) {
                     return isTaskVisibleToUser($pt, $pdUid, $db);
                 }));
@@ -2522,11 +3415,13 @@ try {
                 $project['in_progress_tasks'] = 0;
                 $project['pending_tasks'] = 0;
                 $project['under_review_tasks'] = 0;
+                $project['awaiting_client_approval_tasks'] = 0;
                 foreach ($projectTasks as $vpt) {
                     if ($vpt['status'] === 'COMPLETED') $project['completed_tasks']++;
                     elseif ($vpt['status'] === 'IN PROGRESS') $project['in_progress_tasks']++;
                     elseif ($vpt['status'] === 'PENDING') $project['pending_tasks']++;
                     elseif ($vpt['status'] === 'UNDER REVIEW') $project['under_review_tasks']++;
+                    elseif ($vpt['status'] === 'SENT FOR CLIENT APPROVAL') $project['awaiting_client_approval_tasks']++;
                 }
             }
 
@@ -2539,6 +3434,7 @@ try {
             echo json_encode([
                 'success' => true,
                 'project' => $project,
+                'can_manage_project' => $canManageThisProject,
                 'competitors' => $competitors,
                 'tasks' => $projectTasks
             ]);
@@ -2547,7 +3443,8 @@ try {
         case 'create_project':
             checkAuth('task-management');
             $user = getCurrentUser();
-            if (!isLeadOrAdmin() && $user['role'] === 'Developer') {
+            if (!isLeadOrAdmin()) {
+                http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: Only Leads and Admins can create projects.']);
                 exit;
             }
@@ -2578,18 +3475,30 @@ try {
                 }
             }
 
+            $handlersInput = $input['handlers'] ?? ($input['handler_ids'] ?? []);
+            $handlerIds = is_array($handlersInput) ? array_values(array_unique(array_filter(array_map('intval', $handlersInput)))) : [];
+
+            $observersInput = $input['observers'] ?? ($input['observer_ids'] ?? []);
+            $customObsIds = is_array($observersInput) ? array_map('intval', $observersInput) : [];
+            $observerIds = array_values(array_unique(array_filter(array_merge(getDefaultProjectObserverIds($db, $teamLeadId), $customObsIds), function ($x) { return $x > 0; })));
+
             if (!$clientId || empty($projectName)) {
                 echo json_encode(['success' => false, 'message' => 'Client and Project Name are required.']);
                 exit;
             }
 
             $stmt = $db->prepare("INSERT INTO projects (
-                client_id, project_name, description, about_project, project_url, deliverables_summary, target_audience, start_date, budget_info, priority, status, team_lead_id, department, deadline, is_current, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                client_id, project_name, description, about_project, project_url, deliverables_summary, target_audience, start_date, budget_info, priority, status, team_lead_id, handlers_json, observers_json, department, deadline, is_current, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
-                $clientId, $projectName, $description, $aboutProject, $projectUrl, $deliverablesSummary, $targetAudience, $startDate, $budgetInfo, $priority, $status, $teamLeadId, $department, $deadline, $isCurrent, $user['id']
+                $clientId, $projectName, $description, $aboutProject, $projectUrl, $deliverablesSummary, $targetAudience, $startDate, $budgetInfo, $priority, $status, $teamLeadId, json_encode($handlerIds), json_encode($observerIds), $department, $deadline, $isCurrent, $user['id']
             ]);
             $projectId = $db->lastInsertId();
+
+            if (!empty($handlerIds)) {
+                syncProjectHandlers($db, $projectId, $handlerIds);
+                notifyProjectHandlers($db, $projectId, $projectName, $handlerIds, $user);
+            }
 
             // Optional initial competitors array
             $competitorsInput = $input['competitors'] ?? [];
@@ -2619,15 +3528,17 @@ try {
         case 'update_project':
             checkAuth('task-management');
             $user = getCurrentUser();
-            if (!isLeadOrAdmin() && $user['role'] === 'Developer') {
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Leads and Admins can edit project overview & details.']);
-                exit;
-            }
 
             $projectId = intval($input['project_id'] ?? $input['id'] ?? 0);
             $projectName = trim($input['project_name'] ?? '');
             if ($projectId <= 0 || empty($projectName)) {
                 echo json_encode(['success' => false, 'message' => 'Project ID and Project Name are required.']);
+                exit;
+            }
+
+            if (!canManageProject($db, $projectId, $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Leads, Admins, or Project Handlers can edit project overview & details.']);
                 exit;
             }
 
@@ -2666,20 +3577,230 @@ try {
                 $projectId
             ]);
 
+            if (array_key_exists('handlers', $input) || array_key_exists('handler_ids', $input)) {
+                if (!isLeadOrAdmin()) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads or Super Admins can add or change Project Handlers.']);
+                    exit;
+                }
+                $prevH = getProjectHandlerIds($db, $projectId);
+                $handlersInput = $input['handlers'] ?? ($input['handler_ids'] ?? []);
+                $newH = syncProjectHandlers($db, $projectId, is_array($handlersInput) ? $handlersInput : []);
+                $addedH = array_values(array_diff($newH, $prevH));
+                if (!empty($addedH)) {
+                    notifyProjectHandlers($db, $projectId, $projectName, $addedH, $user);
+                }
+            }
+
+            if (array_key_exists('working_employees', $input) || array_key_exists('working_employee_ids', $input)) {
+                $prevW = getProjectWorkingEmployeeIds($db, $projectId);
+                $workInput = $input['working_employees'] ?? ($input['working_employee_ids'] ?? []);
+                $newW = syncProjectWorkingEmployees($db, $projectId, is_array($workInput) ? $workInput : [], $user['id']);
+                $addedW = array_values(array_diff($newW, $prevW));
+                if (!empty($addedW)) {
+                    $stClName = $db->prepare("SELECT c.company_name FROM projects p LEFT JOIN clients c ON p.client_id = c.id WHERE p.id = ?");
+                    $stClName->execute([$projectId]);
+                    $clName = $stClName->fetchColumn() ?: '';
+                    notifyProjectWorkingEmployees($db, $projectId, $projectName, $clName, $addedW, $user);
+                }
+            }
+
             logActivity($user['id'], 'task-management', 'UPDATE_PROJECT', 'projects', $projectId, "Updated project overview & details for '{$projectName}'");
             echo json_encode(['success' => true, 'message' => 'Project overview & details updated successfully.']);
+            break;
+
+        case 'assign_project_handlers':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+            if (!isLeadOrAdmin()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads or Super Admins can add or assign Project Handlers.']);
+                exit;
+            }
+
+            $projectId = intval($input['project_id'] ?? $input['id'] ?? 0);
+            if ($projectId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Project ID is required.']);
+                exit;
+            }
+            $stPr = $db->prepare("SELECT id, project_name FROM projects WHERE id = ?");
+            $stPr->execute([$projectId]);
+            $projRow = $stPr->fetch();
+            if (!$projRow) {
+                echo json_encode(['success' => false, 'message' => 'Project not found.']);
+                exit;
+            }
+
+            $handlersInput = $input['handlers'] ?? ($input['handler_ids'] ?? []);
+            $prevH = getProjectHandlerIds($db, $projectId);
+            $newH = syncProjectHandlers($db, $projectId, is_array($handlersInput) ? $handlersInput : []);
+            $addedH = array_values(array_diff($newH, $prevH));
+            if (!empty($addedH)) {
+                notifyProjectHandlers($db, $projectId, $projRow['project_name'], $addedH, $user);
+            }
+
+            $handlersMeta = [];
+            if (!empty($newH)) {
+                $ph = implode(',', array_fill(0, count($newH), '?'));
+                $stHM = $db->prepare("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id IN ($ph) ORDER BY u.full_name ASC");
+                $stHM->execute($newH);
+                $handlersMeta = $stHM->fetchAll();
+            }
+
+            logActivity($user['id'], 'task-management', 'ASSIGN_PROJECT_HANDLERS', 'projects', $projectId, "Updated Project Handlers for '{$projRow['project_name']}' (" . count($newH) . " handler(s))");
+            echo json_encode([
+                'success' => true,
+                'project_id' => $projectId,
+                'handler_ids' => $newH,
+                'handlers' => $handlersMeta,
+                'message' => "Project Handlers updated for '{$projRow['project_name']}' (" . count($newH) . " assigned)."
+            ]);
+            break;
+
+        case 'assign_project_working_employees':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+            $projectId = intval($input['project_id'] ?? $input['id'] ?? 0);
+            if ($projectId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Project ID is required.']);
+                exit;
+            }
+            // Accessible by Team Lead, Super Admin, AND Project Handler
+            if (!canManageProject($db, $projectId, $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Leads, Super Admins, or Project Handlers can assign working employees to this project.']);
+                exit;
+            }
+
+            $stPr = $db->prepare("SELECT p.id, p.project_name, c.company_name FROM projects p LEFT JOIN clients c ON p.client_id = c.id WHERE p.id = ?");
+            $stPr->execute([$projectId]);
+            $projRow = $stPr->fetch();
+            if (!$projRow) {
+                echo json_encode(['success' => false, 'message' => 'Project not found.']);
+                exit;
+            }
+
+            $membersInput = $input['working_employees'] ?? ($input['working_employee_ids'] ?? ($input['member_ids'] ?? []));
+            $prevW = getProjectWorkingEmployeeIds($db, $projectId);
+            $newW = syncProjectWorkingEmployees($db, $projectId, is_array($membersInput) ? $membersInput : [], $user['id']);
+            $addedW = array_values(array_diff($newW, $prevW));
+            if (!empty($addedW)) {
+                notifyProjectWorkingEmployees($db, $projectId, $projRow['project_name'], $projRow['company_name'] ?? '', $addedW, $user);
+            }
+
+            $membersMeta = [];
+            if (!empty($newW)) {
+                $phW = implode(',', array_fill(0, count($newW), '?'));
+                $stWM = $db->prepare("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id IN ($phW) ORDER BY u.full_name ASC");
+                $stWM->execute($newW);
+                $membersMeta = $stWM->fetchAll();
+            }
+
+            $addedCount = count($addedW);
+            logActivity($user['id'], 'task-management', 'ASSIGN_PROJECT_MEMBERS', 'projects', $projectId, "Updated working team for '{$projRow['project_name']}' (" . count($newW) . " member(s), {$addedCount} newly added)");
+            echo json_encode([
+                'success' => true,
+                'project_id' => $projectId,
+                'working_employee_ids' => $newW,
+                'working_employees' => $membersMeta,
+                'newly_notified_count' => $addedCount,
+                'message' => "Working team updated for '{$projRow['project_name']}' (" . count($newW) . " working member(s)" . ($addedCount > 0 ? ", notification sent to {$addedCount} newly added employee(s)" : "") . ")."
+            ]);
+            break;
+
+        case 'approve_project_client_completion':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+            $projectId = intval($input['project_id'] ?? 0);
+            $approved = isset($input['approved']) ? intval($input['approved']) : 1;
+
+            if ($projectId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Project ID is required.']);
+                exit;
+            }
+            if (!canManageProject($db, $projectId, $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Project Handlers, Team Leads, or Super Admins can mark client approval for this project.']);
+                exit;
+            }
+
+            $stmtP = $db->prepare("SELECT * FROM projects WHERE id = ?");
+            $stmtP->execute([$projectId]);
+            $proj = $stmtP->fetch();
+            if (!$proj) {
+                echo json_encode(['success' => false, 'message' => 'Project not found.']);
+                exit;
+            }
+
+            if ($approved === 1) {
+                $stmtUnapproved = $db->prepare("SELECT COUNT(*) FROM tasks WHERE project_id = ? AND is_deleted = 0 AND status NOT IN ('SENT FOR CLIENT APPROVAL', 'COMPLETED') AND COALESCE(handler_approved, 0) = 0");
+                $stmtUnapproved = $db->prepare("SELECT COUNT(*) FROM tasks WHERE project_id = ? AND is_deleted = 0 AND status NOT IN ('PENDING LEAD APPROVAL', 'LEAD APPROVED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED') AND COALESCE(handler_approved, 0) = 0");
+                $stmtUnapproved->execute([$projectId]);
+                $pendingHandlerCnt = intval($stmtUnapproved->fetchColumn());
+                if ($pendingHandlerCnt > 0) {
+                    http_response_code(400);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => "Cannot complete project yet: {$pendingHandlerCnt} task(s)/subtask(s) still require Project Handler approval before client approval."
+                    ]);
+                    exit;
+                }
+
+                // Mark any SENT FOR CLIENT APPROVAL tasks as client-approved and COMPLETED
+                if (!isLeadOrAdmin()) {
+                    $stmtUnlead = $db->prepare("SELECT COUNT(*) FROM tasks WHERE project_id = ? AND is_deleted = 0 AND status != 'COMPLETED' AND COALESCE(lead_approved, 0) = 0");
+                    $stmtUnlead->execute([$projectId]);
+                    $pendingLeadCnt = intval($stmtUnlead->fetchColumn());
+                    if ($pendingLeadCnt > 0) {
+                        http_response_code(403);
+                        echo json_encode([
+                            'success' => false,
+                            'message' => "Team Lead / Super Admin approval is required on {$pendingLeadCnt} task(s) before Project Handler can complete the project."
+                        ]);
+                        exit;
+                    }
+                }
+
+                // Mark any Lead-approved / SENT FOR CLIENT APPROVAL tasks as client-approved and COMPLETED
+                $nowTs = date('Y-m-d H:i:s');
+                $stmtTasksUpd = $db->prepare("SELECT id, task_code, status FROM tasks WHERE project_id = ? AND is_deleted = 0 AND status != 'COMPLETED'");
+                $stmtTasksUpd->execute([$projectId]);
+                foreach ($stmtTasksUpd->fetchAll() as $pt) {
+                    $db->prepare("UPDATE tasks SET status = 'COMPLETED', client_approved_by_handler = 1, client_approval_status = 'Approved', client_approved_by = ?, client_approved_at = ?, completion_time = COALESCE(completion_time, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                       ->execute([$user['id'], $nowTs, $nowTs, $pt['id']]);
+                    $db->prepare("UPDATE tasks SET status = 'COMPLETED', handler_approved = 1, lead_approved = 1, lead_approved_by = COALESCE(lead_approved_by, ?), lead_approved_at = COALESCE(lead_approved_at, ?), client_approved_by_handler = 1, client_approval_status = 'Approved', client_approved_by = ?, client_approved_at = ?, completion_time = COALESCE(completion_time, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                       ->execute([$user['id'], $nowTs, $user['id'], $nowTs, $nowTs, $pt['id']]);
+                    $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'CLIENT_APPROVAL', ?, 'COMPLETED', ?)")
+                       ->execute([$pt['id'], $user['id'], $pt['status'], "Project Handler {$user['full_name']} ticked Approved by Client -> Task Completed"]);
+                }
+
+                $db->prepare("UPDATE projects SET client_approved = 1, client_approved_by = ?, client_approved_at = ?, status = 'Completed' WHERE id = ?")
+                   ->execute([$user['id'], $nowTs, $projectId]);
+
+                try {
+                    $db->prepare("INSERT INTO client_notifications (client_id, project_id, notification_type, title, message, is_read) VALUES (?, ?, 'PROJECT_COMPLETED', 'Project Completed & Approved', ?, 0)")
+                       ->execute([$proj['client_id'], $projectId, "Project '{$proj['project_name']}' has been marked Client Approved and Completed."]);
+                } catch (Exception $e) {}
+
+                logActivity($user['id'], 'task-management', 'PROJECT_CLIENT_APPROVED', 'projects', $projectId, "Ticked Approved by Client & completed project '{$proj['project_name']}'");
+                echo json_encode(['success' => true, 'client_approved' => 1, 'status' => 'Completed', 'message' => "Project '{$proj['project_name']}' marked Approved by Client and Completed!"]);
+            } else {
+                $db->prepare("UPDATE projects SET client_approved = 0, client_approved_by = NULL, client_approved_at = NULL, status = 'In Progress' WHERE id = ?")
+                   ->execute([$projectId]);
+                echo json_encode(['success' => true, 'client_approved' => 0, 'status' => 'In Progress', 'message' => 'Client approval tick removed; project moved back to In Progress.']);
+            }
             break;
 
         case 'save_project_competitor':
             checkAuth('task-management');
             $user = getCurrentUser();
-            if (!isLeadOrAdmin() && $user['role'] === 'Developer') {
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Leads and Admins can manage competitor details.']);
-                exit;
-            }
-
             $compId = intval($input['id'] ?? 0);
             $projectId = intval($input['project_id'] ?? 0);
+            if (!canManageProject($db, $projectId, $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Leads, Admins, or Project Handlers can manage competitor details.']);
+                exit;
+            }
             $compName = trim($input['competitor_name'] ?? '');
             $websiteUrl = trim($input['website_url'] ?? '');
             $socialLinks = trim($input['social_links'] ?? '');
@@ -2939,12 +4060,13 @@ try {
                         $targetProjectId = $existingId;
                     }
                 } else {
+                    $impObserverIds = getDefaultProjectObserverIds($db, $teamLeadId);
                     $stmtInsP = $db->prepare("INSERT INTO projects (
-                        client_id, project_name, description, about_project, project_url, deliverables_summary, target_audience, start_date, budget_info, priority, status, team_lead_id, department, deadline, is_current, created_by
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                        client_id, project_name, description, about_project, project_url, deliverables_summary, target_audience, start_date, budget_info, priority, status, team_lead_id, observers_json, department, deadline, is_current, created_by
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmtInsP->execute([
                         $clientId, $projectName, $description, $aboutProject, $projectUrl, $deliverablesSummary,
-                        $targetAudience, $startDate, $budgetInfo, $priority, $status, $teamLeadId, $department,
+                        $targetAudience, $startDate, $budgetInfo, $priority, $status, $teamLeadId, json_encode($impObserverIds), $department,
                         $deadline, $isCurrent, $user['id']
                     ]);
                     $targetProjectId = intval($db->lastInsertId());
@@ -3016,25 +4138,29 @@ try {
             $assignedTo = intval($_GET['assigned_to'] ?? 0);
             $department = trim($_GET['department'] ?? '');
 
-            $sql = "SELECT t.*, c.company_name, p.project_name, 
+            $sql = "SELECT t.*, c.company_name, p.project_name, p.status as project_status,
                     u_assign.full_name as assigned_to_name, 
                     u_lead.full_name as team_lead_name,
-                    u_creator.full_name as created_by_name
+                    u_creator.full_name as created_by_name,
+                    pt.task_code as parent_task_code,
+                    pt.title as parent_task_title,
+                    (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.is_deleted = 0) as subtasks_count
                     FROM tasks t
                     JOIN clients c ON t.client_id = c.id
                     JOIN projects p ON t.project_id = p.id
                     LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
                     LEFT JOIN users u_lead ON t.team_lead_id = u_lead.id
                     LEFT JOIN users u_creator ON t.created_by = u_creator.id
+                    LEFT JOIN tasks pt ON t.parent_task_id = pt.id
                     WHERE t.is_deleted = 0";
             $params = [];
 
             $isLead = isLeadOrAdmin();
             if (!$isLead) {
-                $sql .= " AND " . buildTaskUserMatchWhere($user['id'], $params, 't');
+                $sql .= " AND " . buildTaskUserMatchWhere($user['id'], $params, 't', $db, true);
             } elseif ($assignedTo > 0) {
                 $filterParams = [];
-                $sql .= " AND " . buildTaskUserMatchWhere($assignedTo, $filterParams, 't');
+                $sql .= " AND " . buildTaskUserMatchWhere($assignedTo, $filterParams, 't', null, false);
                 foreach ($filterParams as $fp) {
                     $params[] = $fp;
                 }
@@ -3084,29 +4210,75 @@ try {
                 }));
             }
 
+            $staffMapTasks = [];
+            $stST = $db->query("SELECT u.id, u.full_name, u.department, r.name as role_name FROM users u LEFT JOIN roles r ON u.role_id = r.id");
+            if ($stST) {
+                foreach ($stST->fetchAll() as $suRow) {
+                    $staffMapTasks[intval($suRow['id'])] = $suRow;
+                }
+            }
+            $projHandlerCache = [];
+
             foreach ($tasks as &$t) {
                 $t['sla_status'] = calculateTaskSLAStatus($t);
                 $t['assignee_ids'] = json_decode($t['assignees_json'] ?? '[]', true) ?: [];
                 $t['observer_ids'] = json_decode($t['observers_json'] ?? '[]', true) ?: [];
+                $pidInt = intval($t['project_id'] ?? 0);
+                if ($pidInt > 0 && !isset($projHandlerCache[$pidInt])) {
+                    $projHandlerCache[$pidInt] = getProjectHandlerIds($db, $pidInt);
+                }
+                $hIdsRow = $projHandlerCache[$pidInt] ?? [];
+                $t['project_handler_ids'] = $hIdsRow;
+                $t['project_handlers'] = array_values(array_filter(array_map(function ($hid) use ($staffMapTasks) {
+                    return $staffMapTasks[$hid] ?? null;
+                }, $hIdsRow)));
+                $t['can_manage_task'] = canManageProject($db, $pidInt, $user['id']);
             }
 
             echo json_encode(['success' => true, 'tasks' => $tasks]);
             break;
 
+        case 'create_subtask':
         case 'create_task':
             checkAuth('task-management');
             $user = getCurrentUser();
 
-            if (!isLeadOrAdmin()) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Lead or Super Admin can create tasks.']);
+            $projectId = intval($input['project_id'] ?? 0);
+            $parentTaskId = intval($input['parent_task_id'] ?? 0);
+            $isSubtaskFlag = ($action === 'create_subtask') || ($parentTaskId > 0) || !empty($input['is_subtask']);
+
+            // If creating a sub-task directly from a parent task, inherit project/department if omitted
+            if ($parentTaskId > 0) {
+                $stmtParent = $db->prepare("SELECT id, project_id, department, client_id FROM tasks WHERE id = ? AND is_deleted = 0");
+                $stmtParent->execute([$parentTaskId]);
+                $parentRow = $stmtParent->fetch();
+                if (!$parentRow) {
+                    echo json_encode(['success' => false, 'message' => 'Parent task not found.']);
+                    exit;
+                }
+                if ($projectId <= 0) {
+                    $projectId = intval($parentRow['project_id']);
+                } elseif (intval($parentRow['project_id']) !== $projectId) {
+                    echo json_encode(['success' => false, 'message' => 'Parent task belongs to a different project.']);
+                    exit;
+                }
+            }
+
+            if (!$projectId) {
+                echo json_encode(['success' => false, 'message' => 'Project ID is required.']);
                 exit;
             }
 
-            $projectId = intval($input['project_id'] ?? 0);
+            if (!canManageProject($db, $projectId, $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Lead, Super Admin, or assigned Project Handler can create tasks and sub-tasks.']);
+                exit;
+            }
+
             $title = trim($input['title'] ?? '');
             $description = trim($input['description'] ?? '');
-            $department = $input['department'] ?? 'Development';
+            $department = $input['department'] ?? ($parentRow['department'] ?? 'Development');
+            $taskType = $isSubtaskFlag ? 'subtask' : 'task';
             $assignedTo = intval($input['assigned_to'] ?? 0) ?: null;
             $teamLeadId = intval($input['team_lead_id'] ?? $user['id']);
             $priority = $input['priority'] ?? 'Medium';
@@ -3155,11 +4327,15 @@ try {
             $assigneesJson = json_encode($assigneeIds);
 
             // Observers
+            // Observers: always include default Lead, Super Admin, and CRM project observers + any custom observers
             $observers = $input['observers'] ?? [];
             $observerIds = [];
+            $observerIds = getProjectObserverIds($db, $projectId, $teamLeadId);
             if (!empty($observers) && is_array($observers)) {
                 $observerIds = array_values(array_filter(array_map('intval', $observers)));
+                $observerIds = array_merge($observerIds, array_map('intval', $observers));
             }
+            $observerIds = array_values(array_unique(array_filter($observerIds, function ($x) { return $x > 0; })));
             $observersJson = json_encode($observerIds);
 
             if (!$projectId || empty($title)) {
@@ -3171,16 +4347,17 @@ try {
             $stmtProj->execute([$projectId]);
             $proj = $stmtProj->fetch();
 
-            $taskCode = 'TSK-' . rand(100, 999);
+            $taskCode = ($taskType === 'subtask' ? 'SUB-' : 'TSK-') . rand(100, 999);
             $slaStartTime = $startDate;
             $slaDueTime = $endDate;
-            $clientApprovalStatus = $clientApprovalRequired ? 'Pending' : 'Not Required';
+            $clientApprovalRequired = 1;
+            $clientApprovalStatus = 'Pending';
 
             $stmt = $db->prepare("INSERT INTO tasks (
-                task_code, title, description, client_id, project_id, service_id, department, assigned_to, assignees_json, observers_json, team_lead_id, created_by, priority, status, start_date, end_date, deadline, sla_hours, sla_start_time, sla_due_time, remarks, client_approval_required, client_approval_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, 'Task created and assigned', ?, ?)");
+                task_code, title, description, client_id, project_id, parent_task_id, task_type, service_id, department, assigned_to, assignees_json, observers_json, team_lead_id, created_by, priority, status, start_date, end_date, deadline, sla_hours, sla_start_time, sla_due_time, remarks, client_approval_required, client_approval_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?, 'Task created and assigned', ?, ?)");
             $stmt->execute([
-                $taskCode, $title, $description, $proj['client_id'], $projectId, $proj['service_id'], $department, $assignedTo, $assigneesJson, $observersJson, $teamLeadId, $user['id'], $priority, $startDate, $endDate, $deadline, $slaHours, $slaStartTime, $slaDueTime, $clientApprovalRequired, $clientApprovalStatus
+                $taskCode, $title, $description, $proj['client_id'], $projectId, ($parentTaskId > 0 ? $parentTaskId : null), $taskType, $proj['service_id'], $department, $assignedTo, $assigneesJson, $observersJson, $teamLeadId, $user['id'], $priority, $startDate, $endDate, $deadline, $slaHours, $slaStartTime, $slaDueTime, $clientApprovalRequired, $clientApprovalStatus
             ]);
             $taskId = $db->lastInsertId();
 
@@ -3198,15 +4375,15 @@ try {
             } catch (Exception $eRel) {}
 
             $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, new_value, remarks) VALUES (?, ?, 'TASK_CREATED', 'PENDING', ?)");
-            $stmtAct->execute([$taskId, $user['id'], "Team Lead created task #{$taskCode} and assigned to User ID #{$assignedTo} (Total assignees: " . count($assigneeIds) . ", Observers: " . count($observerIds) . ")"]);
+            $stmtAct->execute([$taskId, $user['id'], ($taskType === 'subtask' ? "Sub-Task" : "Task") . " #{$taskCode} created by {$user['full_name']} and assigned to User ID #{$assignedTo} (Total assignees: " . count($assigneeIds) . ", Observers: " . count($observerIds) . ")"]);
 
             if (!empty($assigneeIds)) {
                 notifyTaskAssignees($db, $taskId, $taskCode, $title, $assigneeIds, $user, $proj['project_name'] ?? '');
             }
 
-            logActivity($user['id'], 'task-management', 'CREATE_TASK', 'tasks', $taskId, "Created task {$taskCode}: {$title}");
+            logActivity($user['id'], 'task-management', 'CREATE_TASK', 'tasks', $taskId, "Created {$taskType} {$taskCode}: {$title}");
 
-            echo json_encode(['success' => true, 'task_id' => $taskId, 'task_code' => $taskCode, 'message' => "Task #{$taskCode} created and assigned successfully."]);
+            echo json_encode(['success' => true, 'task_id' => $taskId, 'task_code' => $taskCode, 'task_type' => $taskType, 'parent_task_id' => ($parentTaskId > 0 ? $parentTaskId : null), 'message' => ($taskType === 'subtask' ? "Sub-Task" : "Task") . " #{$taskCode} created and assigned successfully."]);
             break;
 
         case 'update_task_status':
@@ -3216,7 +4393,7 @@ try {
             $taskId = intval($input['task_id'] ?? 0);
             $newStatus = trim($input['status'] ?? '');
 
-            $validStatuses = ['PENDING', 'IN PROGRESS', 'UNDER REVIEW', 'REVISION REQUIRED', 'COMPLETED'];
+            $validStatuses = ['PENDING', 'IN PROGRESS', 'UNDER REVIEW', 'PENDING LEAD APPROVAL', 'LEAD APPROVED', 'REVISION REQUIRED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED'];
             if (!$taskId || !in_array($newStatus, $validStatuses)) {
                 echo json_encode(['success' => false, 'message' => 'Invalid task ID or status value.']);
                 exit;
@@ -3230,17 +4407,64 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Task not found.']);
                 exit;
             }
-            if (!isLeadOrAdmin() && !isTaskVisibleToUser($task, $user['id'], $db)) {
+
+            $canManageTask = canManageProject($db, $task['project_id'], $user['id']);
+            if (!$canManageTask && !isTaskVisibleToUser($task, $user['id'], $db)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You can only update tasks assigned to you.']);
                 exit;
             }
 
+            // Regular employees cannot mark tasks as Completed or skip handler/lead/client approval
+            if (!$canManageTask && in_array($newStatus, ['COMPLETED', 'SENT FOR CLIENT APPROVAL', 'PENDING LEAD APPROVAL', 'LEAD APPROVED', 'REVISION REQUIRED'], true)) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Employees cannot mark a task as Completed directly. Please submit your work for Project Handler approval first.'
+                ]);
+                exit;
+            }
+
+            // Enforce Project Handler approval -> Lead Approval -> Client Approval tick before task can become COMPLETED
+            if ($newStatus === 'COMPLETED') {
+                $isHandlerApproved = intval($task['handler_approved'] ?? 0) === 1 || in_array($task['status'], ['PENDING LEAD APPROVAL', 'LEAD APPROVED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED'], true);
+                $isLeadApproved = intval($task['lead_approved'] ?? 0) === 1 || $task['status'] === 'LEAD APPROVED' || $task['status'] === 'COMPLETED' || ($task['status'] === 'SENT FOR CLIENT APPROVAL' && intval($task['lead_approved'] ?? 0) === 1);
+                $isClientApproved = intval($task['client_approved_by_handler'] ?? 0) === 1 || ($task['client_approval_status'] ?? '') === 'Approved';
+                if (!$isHandlerApproved) {
+                    http_response_code(400);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Task must first be approved by the Project Handler.'
+                    ]);
+                    exit;
+                }
+                if (!isLeadOrAdmin() && !$isLeadApproved) {
+                    http_response_code(403);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'Team Lead / Super Admin approval is required before a Project Handler can complete this task.'
+                    ]);
+                    exit;
+                }
+                if (!$isClientApproved) {
+                    http_response_code(400);
+                    echo json_encode([
+                        'success' => false,
+                        'message' => "Task must be approved by the Lead and ticked as 'Approved by Client' before marking Completed."
+                    ]);
+                    exit;
+                }
+            }
+
             $oldStatus = $task['status'];
-            $completionTime = ($newStatus === 'COMPLETED') ? date('Y-m-d H:i:s') : $task['completion_time'];
+            $completionTime = ($newStatus === 'COMPLETED') ? ($task['completion_time'] ?: date('Y-m-d H:i:s')) : null;
 
             $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, completion_time = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmtUpd->execute([$newStatus, $completionTime, $taskId]);
+
+            if ($newStatus === 'UNDER REVIEW') {
+                notifyProjectHandlersForReview($db, $task, $user);
+            }
 
             $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'STATUS_CHANGE', ?, ?, ?)");
             $stmtAct->execute([$taskId, $user['id'], $oldStatus, $newStatus, "User changed status from {$oldStatus} to {$newStatus}"]);
@@ -3255,16 +4479,25 @@ try {
             $user = getCurrentUser();
             $taskId = intval($_GET['task_id'] ?? 0);
 
-            $stmt = $db->prepare("SELECT t.*, c.company_name, c.contact_person, p.project_name,
+            $stmt = $db->prepare("SELECT t.*, c.company_name, c.contact_person, p.project_name, p.status as project_status,
                                   u_assign.full_name as assigned_to_name, u_assign.email as assigned_to_email,
                                   u_lead.full_name as team_lead_name,
-                                  u_creator.full_name as created_by_name
+                                  u_creator.full_name as created_by_name,
+                                  pt.task_code as parent_task_code,
+                                  pt.title as parent_task_title,
+                                  u_ha.full_name as handler_approved_by_name,
+                                  u_la.full_name as lead_approved_by_name,
+                                  u_ca.full_name as client_approved_by_name
                                   FROM tasks t
                                   JOIN clients c ON t.client_id = c.id
                                   JOIN projects p ON t.project_id = p.id
                                   LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
                                   LEFT JOIN users u_lead ON t.team_lead_id = u_lead.id
                                   LEFT JOIN users u_creator ON t.created_by = u_creator.id
+                                  LEFT JOIN tasks pt ON t.parent_task_id = pt.id
+                                  LEFT JOIN users u_ha ON t.handler_approved_by = u_ha.id
+                                  LEFT JOIN users u_la ON t.lead_approved_by = u_la.id
+                                  LEFT JOIN users u_ca ON t.client_approved_by = u_ca.id
                                   WHERE t.id = ? AND t.is_deleted = 0");
             $stmt->execute([$taskId]);
             $task = $stmt->fetch();
@@ -3273,13 +4506,15 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Task not found.']);
                 exit;
             }
-            if (!isLeadOrAdmin() && !isTaskVisibleToUser($task, $user['id'], $db)) {
+            $canManageTask = canManageProject($db, $task['project_id'], $user['id']);
+            if (!$canManageTask && !isTaskVisibleToUser($task, $user['id'], $db)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You can only view tasks assigned to you.']);
                 exit;
             }
 
             $task['sla_status'] = calculateTaskSLAStatus($task);
+            $task['can_manage_task'] = $canManageTask;
 
             // Resolve multiple assignees details
             $assigneeIds = json_decode($task['assignees_json'] ?? '[]', true) ?: [];
@@ -3295,7 +4530,12 @@ try {
             }
 
             // Resolve observers details
+            // Resolve observers details (always includes Lead, Super Admin, CRM from project defaults)
             $observerIds = json_decode($task['observers_json'] ?? '[]', true) ?: [];
+            $observerIds = array_values(array_unique(array_filter(array_merge(
+                getProjectObserverIds($db, intval($task['project_id'] ?? 0), intval($task['team_lead_id'] ?? 0)),
+                array_map('intval', $observerIds)
+            ), function ($x) { return $x > 0; })));
             $task['observers'] = [];
             if (!empty($observerIds)) {
                 $placeholders = implode(',', array_fill(0, count($observerIds), '?'));
@@ -3303,6 +4543,13 @@ try {
                 $stmtO->execute($observerIds);
                 $task['observers'] = $stmtO->fetchAll();
             }
+
+            $attachments = [];
+            try {
+                $stmtAtt = $db->prepare("SELECT ta.*, COALESCE(NULLIF(ta.file_path, ''), ta.file_url) as file_path, COALESCE(ta.user_id, ta.uploaded_by) as user_id, u.full_name as uploaded_by_name, u.department FROM task_attachments ta LEFT JOIN users u ON COALESCE(ta.user_id, ta.uploaded_by) = u.id WHERE ta.task_id = ? ORDER BY ta.id DESC");
+                $stmtAtt->execute([$taskId]);
+                $attachments = $stmtAtt->fetchAll();
+            } catch (Exception $eAtt) {}
 
             $stmtCom = $db->prepare("SELECT tc.*, u.full_name as user_name, u.department FROM task_comments tc JOIN users u ON tc.user_id = u.id WHERE tc.task_id = ? ORDER BY tc.id ASC");
             $stmtCom->execute([$taskId]);
@@ -3316,9 +4563,25 @@ try {
             $stmtRev->execute([$taskId]);
             $reviews = $stmtRev->fetchAll();
 
+            $stmtSub = $db->prepare("SELECT st.*, u_assign.full_name as assigned_to_name FROM tasks st LEFT JOIN users u_assign ON st.assigned_to = u_assign.id WHERE st.parent_task_id = ? AND st.is_deleted = 0 ORDER BY st.id ASC");
+            $stmtSub->execute([$taskId]);
+            $subtasks = $stmtSub->fetchAll();
+            if (!$canManageTask) {
+                $subtasks = array_values(array_filter($subtasks, function ($s) use ($user, $db) {
+                    return isTaskVisibleToUser($s, $user['id'], $db);
+                }));
+            }
+            foreach ($subtasks as &$stRow) {
+                $stRow['sla_status'] = calculateTaskSLAStatus($stRow);
+            }
+
             echo json_encode([
                 'success' => true,
+                'can_manage_task' => $canManageTask,
+                'is_lead_or_admin' => isLeadOrAdmin(),
                 'task' => $task,
+                'subtasks' => $subtasks,
+                'attachments' => $attachments,
                 'comments' => $comments,
                 'activities' => $activities,
                 'reviews' => $reviews
@@ -3342,7 +4605,7 @@ try {
                 exit;
             }
 
-            if (!isLeadOrAdmin() && !isTaskVisibleToUser($task, $user['id'], $db)) {
+            if (!canManageProject($db, $task['project_id'], $user['id']) && !isTaskVisibleToUser($task, $user['id'], $db)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You can only submit work for tasks assigned to you.']);
                 exit;
@@ -3351,7 +4614,7 @@ try {
             $stmtUpd = $db->prepare("UPDATE tasks SET status = 'UNDER REVIEW', remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
             $stmtUpd->execute([$submissionNotes, $taskId]);
 
-            $commentText = "⚡ Submitted work for Team Lead review.\nNotes: " . $submissionNotes;
+            $commentText = "⚡ Submitted work for Project Handler approval.\nNotes: " . $submissionNotes;
             if (!empty($attachmentUrl)) $commentText .= "\nDeliverable URL: " . $attachmentUrl;
 
             $stmtCom = $db->prepare("INSERT INTO task_comments (task_id, user_id, comment_text, attachment_url) VALUES (?, ?, ?, ?)");
@@ -3360,20 +4623,16 @@ try {
             $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'DEVELOPER_SUBMISSION', ?, 'UNDER REVIEW', ?)");
             $stmtAct->execute([$taskId, $user['id'], $task['status'], $submissionNotes]);
 
+            notifyProjectHandlersForReview($db, $task, $user);
+
             logActivity($user['id'], 'task-management', 'SUBMIT_WORK', 'tasks', $taskId, "Submitted work for task #{$task['task_code']}");
 
-            echo json_encode(['success' => true, 'message' => 'Work submitted successfully! Status changed to UNDER REVIEW for Team Lead approval.']);
+            echo json_encode(['success' => true, 'message' => 'Work submitted successfully! Status changed to UNDER REVIEW for Project Handler approval.']);
             break;
 
         case 'review_task_work':
             checkAuth('task-management');
             $user = getCurrentUser();
-
-            if (!isLeadOrAdmin()) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Lead or Super Admin can review tasks.']);
-                exit;
-            }
 
             $taskId = intval($input['task_id'] ?? 0);
             $reviewAction = $input['review_action'] ?? 'APPROVE';
@@ -3389,52 +4648,168 @@ try {
                 exit;
             }
 
+            if (!canManageProject($db, $task['project_id'], $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Project Handler, Team Lead, or Super Admin can approve tasks.']);
+                exit;
+            }
+
             $newStatus = $task['status'];
             $completionTime = null;
             $clientApprovalStatus = $task['client_approval_status'];
+            $handlerApproved = intval($task['handler_approved'] ?? 0);
+            $handlerApprovedBy = $task['handler_approved_by'] ?? null;
+            $handlerApprovedAt = $task['handler_approved_at'] ?? null;
+            $leadApproved = intval($task['lead_approved'] ?? 0);
+            $leadApprovedBy = $task['lead_approved_by'] ?? null;
+            $leadApprovedAt = $task['lead_approved_at'] ?? null;
 
             if ($reviewAction === 'REQUEST_REVISION') {
                 $newStatus = 'REVISION REQUIRED';
-            } elseif ($reviewAction === 'SEND_CLIENT_APPROVAL') {
+                $handlerApproved = 0;
+                $handlerApprovedBy = null;
+                $handlerApprovedAt = null;
+                $leadApproved = 0;
+                $leadApprovedBy = null;
+                $leadApprovedAt = null;
+            } else {
+                // Project Handler approval ALWAYS advances to Client Approval stage (before Completed tick)
                 $newStatus = 'SENT FOR CLIENT APPROVAL';
                 $clientApprovalStatus = 'Pending';
-            } else {
-                if ($task['client_approval_required']) {
+                $handlerApproved = 1;
+                $handlerApprovedBy = $user['id'];
+                $handlerApprovedAt = date('Y-m-d H:i:s');
+                if (isLeadOrAdmin()) {
+                    // Lead/Super Admin approval satisfies Lead Approval (and Handler Approval if not yet marked)
+                    if ($handlerApproved !== 1) {
+                        $handlerApproved = 1;
+                        $handlerApprovedBy = $user['id'];
+                        $handlerApprovedAt = date('Y-m-d H:i:s');
+                    }
+                    $leadApproved = 1;
+                    $leadApprovedBy = $user['id'];
+                    $leadApprovedAt = date('Y-m-d H:i:s');
                     $newStatus = 'SENT FOR CLIENT APPROVAL';
                     $clientApprovalStatus = 'Pending';
                 } else {
-                    $newStatus = 'COMPLETED';
-                    $completionTime = date('Y-m-d H:i:s');
+                    // Non-Lead Project Handler approves employee work -> waits for Lead approval before Handler can complete
+                    $newStatus = 'PENDING LEAD APPROVAL';
+                    $clientApprovalStatus = 'Pending';
+                    $handlerApproved = 1;
+                    $handlerApprovedBy = $user['id'];
+                    $handlerApprovedAt = date('Y-m-d H:i:s');
                 }
             }
 
-            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, completion_time = ?, client_approval_status = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $stmtUpd->execute([$newStatus, $completionTime, $clientApprovalStatus, $reviewComment, $taskId]);
+            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, completion_time = ?, client_approval_required = 1, client_approval_status = ?, handler_approved = ?, handler_approved_by = ?, handler_approved_at = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUpd->execute([$newStatus, $completionTime, $clientApprovalStatus, $handlerApproved, $handlerApprovedBy, $handlerApprovedAt, $reviewComment, $taskId]);
+            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, completion_time = ?, client_approval_required = 1, client_approval_status = ?, handler_approved = ?, handler_approved_by = ?, handler_approved_at = ?, lead_approved = ?, lead_approved_by = ?, lead_approved_at = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUpd->execute([$newStatus, $completionTime, $clientApprovalStatus, $handlerApproved, $handlerApprovedBy, $handlerApprovedAt, $leadApproved, $leadApprovedBy, $leadApprovedAt, $reviewComment, $taskId]);
 
             $stmtRev = $db->prepare("INSERT INTO task_reviews (task_id, team_lead_id, developer_id, review_action, review_comment, required_changes) VALUES (?, ?, ?, ?, ?, ?)");
             $stmtRev->execute([$taskId, $user['id'], $task['assigned_to'], $reviewAction, $reviewComment, $requiredChanges]);
 
-            $commentMsg = "🛠️ Team Lead Review Action: " . $reviewAction . "\nComment: " . $reviewComment;
+            $commentMsg = ($reviewAction === 'REQUEST_REVISION' ? "🔄 Project Handler / Lead Requested Revision" : "✅ Project Handler Approved & Sent for Client Approval") . "\nComment: " . $reviewComment;
+            if ($reviewAction === 'REQUEST_REVISION') {
+                $commentMsg = "🔄 Project Handler / Lead Requested Revision\nComment: " . $reviewComment;
+            } elseif (isLeadOrAdmin()) {
+                $commentMsg = "✅ Lead Approved & Cleared for Client Approval / Completion\nComment: " . $reviewComment;
+                notifyHandlerLeadApproved($db, $task, $user);
+            } else {
+                $commentMsg = "✅ Approved by Project Handler — Pending Lead Approval before completion\nComment: " . $reviewComment;
+                notifyLeadsForTaskApproval($db, $task, $user);
+            }
             if (!empty($requiredChanges)) $commentMsg .= "\nRequired Revisions: " . $requiredChanges;
 
             $stmtCom = $db->prepare("INSERT INTO task_comments (task_id, user_id, comment_text) VALUES (?, ?, ?)");
             $stmtCom->execute([$taskId, $user['id'], $commentMsg]);
 
-            $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'TEAM_LEAD_REVIEW', ?, ?, ?)");
+            $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'HANDLER_APPROVAL', ?, ?, ?)");
             $stmtAct->execute([$taskId, $user['id'], $task['status'], $newStatus, "Action: {$reviewAction} - {$reviewComment}"]);
 
-            logActivity($user['id'], 'task-management', 'TEAM_LEAD_REVIEW', 'tasks', $taskId, "Reviewed task #{$task['task_code']}: {$reviewAction}");
+            logActivity($user['id'], 'task-management', 'TEAM_LEAD_REVIEW', 'tasks', $taskId, "Reviewed task #{$task['task_code']}: {$reviewAction} -> {$newStatus}");
 
-            echo json_encode(['success' => true, 'new_status' => $newStatus, 'message' => "Team Lead review recorded. Task status updated to {$newStatus}."]);
+            $msgOut = ($reviewAction === 'REQUEST_REVISION')
+                ? "Revision requested. Task sent back to employee ({$newStatus})."
+                : "Approved by Project Handler! Task moved to Client Approval ({$newStatus}). Tick 'Approved by Client' once the client approves.";
+            echo json_encode(['success' => true, 'new_status' => $newStatus, 'handler_approved' => $handlerApproved, 'message' => $msgOut]);
+            if ($reviewAction === 'REQUEST_REVISION') {
+                $msgOut = "Revision requested. Task sent back to employee ({$newStatus}).";
+            } elseif (isLeadOrAdmin()) {
+                $msgOut = "Lead Approved! Task is now in Client Approval ({$newStatus}) and Project Handler can tick 'Approved by Client' to complete.";
+            } else {
+                $msgOut = "Approved by Project Handler! Sent to Team Lead for completion approval ({$newStatus}).";
+            }
+            echo json_encode(['success' => true, 'new_status' => $newStatus, 'handler_approved' => $handlerApproved, 'lead_approved' => $leadApproved, 'message' => $msgOut]);
             break;
 
+        case 'lead_approve_task':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+
+            if (!isLeadOrAdmin()) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Team Lead or Super Admin can issue Lead Approval.']);
+                exit;
+            }
+
+            $taskId = intval($input['task_id'] ?? 0);
+            $reviewAction = strtoupper(trim($input['review_action'] ?? 'APPROVE'));
+            $comment = trim($input['comment'] ?? ($input['review_comment'] ?? 'Approved by Lead for completion'));
+
+            $stmtTask = $db->prepare("SELECT * FROM tasks WHERE id = ?");
+            $stmtTask->execute([$taskId]);
+            $task = $stmtTask->fetch();
+            if (!$task) {
+                echo json_encode(['success' => false, 'message' => 'Task not found.']);
+                exit;
+            }
+
+            if ($reviewAction === 'REQUEST_REVISION') {
+                $newStatus = 'REVISION REQUIRED';
+                $db->prepare("UPDATE tasks SET status = ?, handler_approved = 0, lead_approved = 0, lead_approved_by = NULL, lead_approved_at = NULL, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                   ->execute([$newStatus, $comment, $taskId]);
+                $db->prepare("INSERT INTO task_reviews (task_id, team_lead_id, developer_id, review_action, review_comment, required_changes) VALUES (?, ?, ?, 'REQUEST_REVISION', ?, ?)")
+                   ->execute([$taskId, $user['id'], $task['assigned_to'], $comment, $comment]);
+                $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'LEAD_APPROVAL', ?, ?, ?)")
+                   ->execute([$taskId, $user['id'], $task['status'], $newStatus, "Lead requested revision: {$comment}"]);
+                echo json_encode(['success' => true, 'new_status' => $newStatus, 'lead_approved' => 0, 'message' => 'Lead requested revision on this task.']);
+                exit;
+            }
+
+            $now = date('Y-m-d H:i:s');
+            $handlerApproved = intval($task['handler_approved'] ?? 0) === 1 ? 1 : 1;
+            $handlerApprovedBy = $task['handler_approved_by'] ?: $user['id'];
+            $handlerApprovedAt = $task['handler_approved_at'] ?: $now;
+            $newStatus = 'SENT FOR CLIENT APPROVAL';
+
+            $db->prepare("UPDATE tasks SET status = ?, handler_approved = ?, handler_approved_by = ?, handler_approved_at = ?, lead_approved = 1, lead_approved_by = ?, lead_approved_at = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+               ->execute([$newStatus, $handlerApproved, $handlerApprovedBy, $handlerApprovedAt, $user['id'], $now, $comment, $taskId]);
+            $db->prepare("INSERT INTO task_reviews (task_id, team_lead_id, developer_id, review_action, review_comment) VALUES (?, ?, ?, 'LEAD_APPROVE', ?)")
+               ->execute([$taskId, $user['id'], $task['assigned_to'], $comment]);
+            $db->prepare("INSERT INTO task_comments (task_id, user_id, comment_text) VALUES (?, ?, ?)")
+               ->execute([$taskId, $user['id'], "✅ Lead Approved — Project Handler can now tick 'Approved by Client' to complete.\nNote: {$comment}"]);
+            $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'LEAD_APPROVAL', ?, ?, ?)")
+               ->execute([$taskId, $user['id'], $task['status'], $newStatus, "Lead approved task: {$comment}"]);
+
+            notifyHandlerLeadApproved($db, $task, $user);
+            logActivity($user['id'], 'task-management', 'LEAD_APPROVE_TASK', 'tasks', $taskId, "Lead approved task #{$task['task_code']}");
+
+            echo json_encode(['success' => true, 'new_status' => $newStatus, 'lead_approved' => 1, 'message' => 'Lead approval granted! Project Handler can now complete this task.']);
+            break;
+
+        case 'toggle_task_client_approval':
         case 'process_client_approval':
             checkAuth('task-management');
             $user = getCurrentUser();
 
             $taskId = intval($input['task_id'] ?? 0);
-            $approvalStatus = $input['approval_status'] ?? 'Approved';
-            $clientFeedback = trim($input['client_feedback'] ?? '');
+            if (isset($input['approved'])) {
+                $approvalStatus = intval($input['approved']) === 1 ? 'Approved' : 'Pending';
+            } else {
+                $approvalStatus = $input['approval_status'] ?? 'Approved';
+            }
+            $clientFeedback = trim($input['client_feedback'] ?? ($approvalStatus === 'Approved' ? 'Approved by client (confirmed by Project Handler).' : 'Client approval unchecked.'));
 
             $stmtTask = $db->prepare("SELECT * FROM tasks WHERE id = ?");
             $stmtTask->execute([$taskId]);
@@ -3445,26 +4820,76 @@ try {
                 exit;
             }
 
+            if (!canManageProject($db, $task['project_id'], $user['id']) && $user['role'] !== 'Client') {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Project Handler, Team Lead, Admin, or Client can mark Client Approval.']);
+                exit;
+            }
+
+            $isHandlerApproved = intval($task['handler_approved'] ?? 0) === 1 || in_array($task['status'], ['SENT FOR CLIENT APPROVAL', 'COMPLETED'], true);
+            $isHandlerApproved = intval($task['handler_approved'] ?? 0) === 1 || in_array($task['status'], ['PENDING LEAD APPROVAL', 'LEAD APPROVED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED'], true);
+            $isLeadApproved = intval($task['lead_approved'] ?? 0) === 1 || in_array($task['status'], ['LEAD APPROVED', 'COMPLETED'], true);
+            if ($approvalStatus === 'Approved' && !$isHandlerApproved) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Task must be approved by the Project Handler first before Client Approval can be ticked.']);
+                exit;
+            }
+            if ($approvalStatus === 'Approved' && !isLeadOrAdmin() && !$isLeadApproved) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Team Lead / Super Admin approval is required before a Project Handler can complete this task.']);
+                exit;
+            }
+            if ($approvalStatus === 'Approved' && isLeadOrAdmin() && intval($task['lead_approved'] ?? 0) !== 1) {
+                $db->prepare("UPDATE tasks SET lead_approved = 1, lead_approved_by = ?, lead_approved_at = CURRENT_TIMESTAMP WHERE id = ?")
+                   ->execute([$user['id'], $taskId]);
+            }
+
             $newStatus = $task['status'];
             $completionTime = null;
+            $clientApprovedFlag = 0;
+            $clientApprovedBy = null;
+            $clientApprovedAt = null;
 
             if ($approvalStatus === 'Approved') {
                 $newStatus = 'COMPLETED';
                 $completionTime = date('Y-m-d H:i:s');
+                $clientApprovedFlag = 1;
+                $clientApprovedBy = $user['id'];
+                $clientApprovedAt = $completionTime;
+            } elseif ($approvalStatus === 'Pending') {
+                $newStatus = 'SENT FOR CLIENT APPROVAL';
             } else {
                 $newStatus = 'CLIENT REVISION REQUESTED';
             }
 
-            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, client_approval_status = ?, completion_time = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $stmtUpd->execute([$newStatus, $approvalStatus, $completionTime, $clientFeedback, $taskId]);
+            $stmtUpd = $db->prepare("UPDATE tasks SET status = ?, client_approval_status = ?, client_approved_by_handler = ?, client_approved_by = ?, client_approved_at = ?, completion_time = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmtUpd->execute([$newStatus, $approvalStatus, $clientApprovedFlag, $clientApprovedBy, $clientApprovedAt, $completionTime, $clientFeedback, $taskId]);
 
-            $stmtAppr = $db->prepare("INSERT INTO client_approvals (task_id, client_id, approval_status, client_feedback, approved_at) VALUES (?, ?, ?, ?, ?)");
-            $stmtAppr->execute([$taskId, $task['client_id'], $approvalStatus, $clientFeedback, $completionTime]);
+            try {
+                $stmtAppr = $db->prepare("INSERT INTO client_approvals (task_id, client_id, approval_status, client_feedback, approved_at) VALUES (?, ?, ?, ?, ?)");
+                $stmtAppr->execute([$taskId, $task['client_id'], $approvalStatus, $clientFeedback, $completionTime]);
+            } catch (Exception $eAppr) {}
 
             $stmtAct = $db->prepare("INSERT INTO task_activities (task_id, user_id, action, old_value, new_value, remarks) VALUES (?, ?, 'CLIENT_APPROVAL', ?, ?, ?)");
             $stmtAct->execute([$taskId, $user['id'], $task['status'], $newStatus, "Client {$approvalStatus}: {$clientFeedback}"]);
 
-            echo json_encode(['success' => true, 'new_status' => $newStatus, 'message' => "Client approval response recorded as {$approvalStatus}."]);
+            // Check if all tasks in this project are now completed
+            $stRem = $db->prepare("SELECT COUNT(*) FROM tasks WHERE project_id = ? AND is_deleted = 0 AND status != 'COMPLETED'");
+            $stRem->execute([$task['project_id']]);
+            $remainingTasks = intval($stRem->fetchColumn());
+            $allTasksCompleted = ($remainingTasks === 0);
+
+            logActivity($user['id'], 'task-management', 'CLIENT_APPROVAL', 'tasks', $taskId, "Client approval {$approvalStatus} for task #{$task['task_code']} -> {$newStatus}");
+
+            echo json_encode([
+                'success' => true,
+                'new_status' => $newStatus,
+                'client_approved_by_handler' => $clientApprovedFlag,
+                'all_tasks_completed' => $allTasksCompleted,
+                'message' => $approvalStatus === 'Approved'
+                    ? "Client approval ticked! Task #{$task['task_code']} is now COMPLETED."
+                    : "Client approval status updated to {$approvalStatus}."
+            ]);
             break;
 
         case 'add_task_comment':
@@ -3565,7 +4990,7 @@ try {
             if (!isLeadOrAdmin()) {
                 $devId = intval($user['id']);
                 $paramsM = [];
-                $sqlM = "SELECT id, status, assigned_to, assignees_json, observers_json FROM tasks WHERE is_deleted = 0 AND " . buildTaskUserMatchWhere($devId, $paramsM, 'tasks');
+                $sqlM = "SELECT id, project_id, status, assigned_to, assignees_json, observers_json FROM tasks WHERE is_deleted = 0 AND " . buildTaskUserMatchWhere($devId, $paramsM, 'tasks', $db, true);
                 $stmtM = $db->prepare($sqlM);
                 $stmtM->execute($paramsM);
                 $myTasks = array_values(array_filter($stmtM->fetchAll(), function ($t) use ($devId, $db) {
@@ -3665,10 +5090,10 @@ try {
 
             $isLead = isLeadOrAdmin();
             if (!$isLead || $viewMode === 'my') {
-                $sql .= " AND " . buildTaskUserMatchWhere($user['id'], $params, 't');
+                $sql .= " AND " . buildTaskUserMatchWhere($user['id'], $params, 't', $db, !$isLead);
             } elseif ($devId > 0) {
                 $filterParams = [];
-                $sql .= " AND " . buildTaskUserMatchWhere($devId, $filterParams, 't');
+                $sql .= " AND " . buildTaskUserMatchWhere($devId, $filterParams, 't', null, false);
                 foreach ($filterParams as $fp) {
                     $params[] = $fp;
                 }
@@ -3828,7 +5253,8 @@ try {
                 exit;
             }
 
-            if (!isLeadOrAdmin() && !isTaskVisibleToUser($task, $user['id'], $db)) {
+            $canManageTaskCal = canManageProject($db, $task['project_id'], $user['id']);
+            if (!$canManageTaskCal && !isTaskVisibleToUser($task, $user['id'], $db)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You cannot modify tasks assigned to other employees.']);
                 exit;
@@ -3883,31 +5309,58 @@ try {
                 exit;
             }
 
-            if (!isLeadOrAdmin() && !isTaskVisibleToUser($task, $user['id'], $db)) {
+            $canManageTaskCal = canManageProject($db, $task['project_id'], $user['id']);
+            if (!$canManageTaskCal && !isTaskVisibleToUser($task, $user['id'], $db)) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You cannot edit tasks assigned to other employees.']);
                 exit;
             }
 
-            // Regular employee can't change assigned_to, title, or project_id
-            if (!isLeadOrAdmin()) {
+            // Regular employee can't change assigned_to, title, project_id, or mark Completed / Client Approval
+            if (!$canManageTaskCal) {
                 $assignedTo = $task['assigned_to'];
                 $title = $task['title'];
                 $projectId = intval($task['project_id']);
                 $priority = $task['priority'];
                 $description = $task['description'];
+                if (in_array($status, ['COMPLETED', 'SENT FOR CLIENT APPROVAL', 'REVISION REQUIRED'], true)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Employees cannot mark a task as Completed directly. Submit work for Project Handler approval first.']);
+                    exit;
+                }
+            }
+
+            if ($status === 'COMPLETED') {
+                $isHandlerApproved = intval($task['handler_approved'] ?? 0) === 1 || in_array($task['status'], ['PENDING LEAD APPROVAL', 'LEAD APPROVED', 'SENT FOR CLIENT APPROVAL', 'COMPLETED'], true);
+                $isLeadApproved = intval($task['lead_approved'] ?? 0) === 1 || in_array($task['status'], ['LEAD APPROVED', 'COMPLETED'], true) || ($task['status'] === 'SENT FOR CLIENT APPROVAL' && intval($task['lead_approved'] ?? 0) === 1);
+                $isClientApproved = intval($task['client_approved_by_handler'] ?? 0) === 1 || ($task['client_approval_status'] ?? '') === 'Approved';
+                if (!$isHandlerApproved) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Task must be approved by the Project Handler first.']);
+                    exit;
+                }
+                if (!isLeadOrAdmin() && !$isLeadApproved) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'Team Lead / Super Admin approval is required before a Project Handler can complete this task.']);
+                    exit;
+                }
+                if (!$isClientApproved) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => "Task must be approved by the Lead and ticked 'Approved by Client' before marking Completed."]);
+                    exit;
+                }
             }
 
             $startFormatted = !empty($startDate) ? date('Y-m-d H:i:s', strtotime($startDate)) : $task['start_date'];
             $endFormatted = !empty($endDate) ? date('Y-m-d H:i:s', strtotime($endDate)) : $task['end_date'];
             if (!$endFormatted) $endFormatted = $task['deadline'];
 
-            $completionTime = ($status === 'COMPLETED' && $task['status'] !== 'COMPLETED') ? date('Y-m-d H:i:s') : $task['completion_time'];
+            $completionTime = ($status === 'COMPLETED') ? ($task['completion_time'] ?: date('Y-m-d H:i:s')) : null;
 
             $oldAssignedTo = intval($task['assigned_to'] ?? 0);
             $newAssignedToInt = intval($assignedTo ?? 0);
             $assigneesJsonUpd = $task['assignees_json'] ?? '[]';
-            if (isLeadOrAdmin() && $newAssignedToInt > 0 && $newAssignedToInt !== $oldAssignedTo) {
+            if ($canManageTaskCal && $newAssignedToInt > 0 && $newAssignedToInt !== $oldAssignedTo) {
                 $existingAssignees = json_decode($assigneesJsonUpd, true) ?: [];
                 $existingAssignees = array_values(array_unique(array_filter(array_map('intval', $existingAssignees))));
                 if (!in_array($newAssignedToInt, $existingAssignees, true)) {
@@ -3941,7 +5394,7 @@ try {
                 $title, $description, $projectId, $projectId, $assignedTo, $assigneesJsonUpd, $priority, $status, $startFormatted, $endFormatted, $endFormatted, $completionTime, $taskId
             ]);
 
-            if (isLeadOrAdmin() && $newAssignedToInt > 0 && $newAssignedToInt !== $oldAssignedTo) {
+            if ($canManageTaskCal && $newAssignedToInt > 0 && $newAssignedToInt !== $oldAssignedTo) {
                 $effProjId = $projectId > 0 ? $projectId : intval($task['project_id'] ?? 0);
                 $projNameCal = '';
                 if ($effProjId > 0) {
@@ -6114,16 +7567,7 @@ try {
             $userId = $currUser['id'] ?? 0;
 
             try {
-                $db->exec("CREATE TABLE IF NOT EXISTS user_notifications (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    title VARCHAR(255) NOT NULL,
-                    message TEXT NOT NULL,
-                    type VARCHAR(50) DEFAULT 'general',
-                    link_url VARCHAR(255) DEFAULT '',
-                    is_read INTEGER DEFAULT 0,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )");
+                ensureUserNotificationsTable($db);
             } catch (Exception $e) {}
 
             $stmt = $db->prepare("
@@ -6880,6 +8324,436 @@ try {
             $db->prepare("UPDATE chat_conversations SET last_message_at = ? WHERE id = ?")->execute([$now, $convId]);
 
             echo json_encode(['success' => true, 'message' => 'You left the group.']);
+            break;
+
+        case 'upload_task_media':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+
+            $taskId = intval($_POST['task_id'] ?? ($input['task_id'] ?? 0));
+            $caption = trim($_POST['caption'] ?? ($input['caption'] ?? ''));
+            $attachmentStage = trim($_POST['attachment_stage'] ?? ($input['attachment_stage'] ?? 'work'));
+            if (!in_array($attachmentStage, ['work', 'submission', 'review', 'general'], true)) {
+                $attachmentStage = 'work';
+            }
+
+            if ($taskId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Task ID is required.']);
+                exit;
+            }
+
+            $stmtT = $db->prepare("SELECT * FROM tasks WHERE id = ? AND is_deleted = 0");
+            $stmtT->execute([$taskId]);
+            $task = $stmtT->fetch();
+            if (!$task) {
+                echo json_encode(['success' => false, 'message' => 'Task not found.']);
+                exit;
+            }
+
+            if (!canManageProject($db, $task['project_id'], $user['id']) && !isTaskVisibleToUser($task, $user['id'], $db)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: You can only upload media to your own or managed tasks.']);
+                exit;
+            }
+
+            // Collect files from $_FILES['file'] or $_FILES['files']
+            $filesToProcess = [];
+            foreach (['files', 'file'] as $field) {
+                if (empty($_FILES[$field])) continue;
+                $f = $_FILES[$field];
+                if (is_array($f['name'])) {
+                    $cnt = count($f['name']);
+                    for ($i = 0; $i < $cnt; $i++) {
+                        if (($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+                        $filesToProcess[] = [
+                            'name' => $f['name'][$i],
+                            'tmp_name' => $f['tmp_name'][$i],
+                            'type' => $f['type'][$i] ?? '',
+                            'size' => intval($f['size'][$i] ?? 0),
+                            'error' => intval($f['error'][$i] ?? 0)
+                        ];
+                    }
+                } elseif (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                    $filesToProcess[] = [
+                        'name' => $f['name'],
+                        'tmp_name' => $f['tmp_name'],
+                        'type' => $f['type'] ?? '',
+                        'size' => intval($f['size'] ?? 0),
+                        'error' => intval($f['error'] ?? 0)
+                    ];
+                }
+            }
+
+            if (empty($filesToProcess)) {
+                echo json_encode(['success' => false, 'message' => 'No media file received. Please select a file to upload.']);
+                exit;
+            }
+
+            $uploadDir = __DIR__ . '/uploads/tasks';
+            if (!is_dir($uploadDir)) {
+                @mkdir($uploadDir, 0755, true);
+            }
+
+            $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'mp4', 'mov', 'webm', 'mp3'];
+            $maxBytes = 25 * 1024 * 1024;
+            $savedAttachments = [];
+            $errors = [];
+
+            $stmtInsAtt = $db->prepare("INSERT INTO task_attachments (task_id, user_id, uploaded_by, file_name, file_url, file_path, mime_type, file_size, caption, attachment_stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            foreach ($filesToProcess as $fileItem) {
+                if ($fileItem['error'] !== UPLOAD_ERR_OK) {
+                    $errors[] = "{$fileItem['name']}: Upload error code {$fileItem['error']}";
+                    continue;
+                }
+                if ($fileItem['size'] > $maxBytes) {
+                    $errors[] = "{$fileItem['name']}: Exceeds 25MB size limit";
+                    continue;
+                }
+                $origName = basename($fileItem['name']);
+                $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowedExts, true)) {
+                    $errors[] = "{$origName}: Unsupported file type (.{$ext})";
+                    continue;
+                }
+
+                $safeBase = preg_replace('/[^A-Za-z0-9._-]/', '_', $origName);
+                $storedName = 'tsk_' . $taskId . '_' . time() . '_' . substr(md5(uniqid(mt_rand(), true)), 0, 6) . '_' . $safeBase;
+                $destAbs = $uploadDir . '/' . $storedName;
+                $destRel = 'uploads/tasks/' . $storedName;
+
+                if (!move_uploaded_file($fileItem['tmp_name'], $destAbs)) {
+                    $errors[] = "{$origName}: Failed to store uploaded file";
+                    continue;
+                }
+
+                $mimeType = trim($fileItem['type'] ?? '');
+                if ($mimeType === '' && function_exists('mime_content_type')) {
+                    $mimeType = @mime_content_type($destAbs) ?: 'application/octet-stream';
+                }
+
+                $stmtInsAtt->execute([
+                    $taskId,
+                    $user['id'],
+                    $user['id'],
+                    $origName,
+                    $destRel,
+                    $destRel,
+                    $mimeType,
+                    $fileItem['size'],
+                    $caption,
+                    $attachmentStage
+                ]);
+                $attId = intval($db->lastInsertId());
+                $savedAttachments[] = [
+                    'id' => $attId,
+                    'task_id' => $taskId,
+                    'user_id' => $user['id'],
+                    'uploaded_by_name' => $user['full_name'] ?? $user['username'],
+                    'file_name' => $origName,
+                    'file_path' => $destRel,
+                    'mime_type' => $mimeType,
+                    'file_size' => $fileItem['size'],
+                    'caption' => $caption,
+                    'attachment_stage' => $attachmentStage,
+                    'created_at' => date('Y-m-d H:i:s')
+                ];
+            }
+
+            if (empty($savedAttachments)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => implode('; ', $errors) ?: 'Could not save attachment(s).']);
+                exit;
+            }
+
+            $namesStr = implode(', ', array_column($savedAttachments, 'file_name'));
+            $db->prepare("INSERT INTO task_activities (task_id, user_id, action, new_value, remarks) VALUES (?, ?, 'MEDIA_UPLOADED', ?, ?)")
+               ->execute([$taskId, $user['id'], $namesStr, ($caption !== '' ? $caption : "Uploaded " . count($savedAttachments) . " media file(s)")]);
+            logActivity($user['id'], 'task-management', 'UPLOAD_TASK_MEDIA', 'tasks', $taskId, "Uploaded media to task #{$task['task_code']}: {$namesStr}");
+
+            echo json_encode([
+                'success' => true,
+                'attachments' => $savedAttachments,
+                'errors' => $errors,
+                'message' => count($savedAttachments) . ' media file(s) attached to task.'
+            ]);
+            break;
+
+        case 'delete_task_media':
+            checkAuth('task-management');
+            $user = getCurrentUser();
+            $attId = intval($input['attachment_id'] ?? ($_GET['attachment_id'] ?? 0));
+            if ($attId <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Attachment ID is required.']);
+                exit;
+            }
+            $stAtt = $db->prepare("SELECT ta.*, t.project_id FROM task_attachments ta JOIN tasks t ON ta.task_id = t.id WHERE ta.id = ?");
+            $stAtt->execute([$attId]);
+            $att = $stAtt->fetch();
+            if (!$att) {
+                echo json_encode(['success' => false, 'message' => 'Attachment not found.']);
+                exit;
+            }
+            if (intval($att['user_id'] ?? ($att['uploaded_by'] ?? 0)) !== intval($user['id']) && !canManageProject($db, $att['project_id'], $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: You cannot delete this attachment.']);
+                exit;
+            }
+            $relPath = !empty($att['file_path']) ? $att['file_path'] : ($att['file_url'] ?? '');
+            $absPath = $relPath !== '' ? (__DIR__ . '/' . ltrim($relPath, '/\\')) : '';
+            if ($absPath !== '' && is_file($absPath)) {
+                @unlink($absPath);
+            }
+            $db->prepare("DELETE FROM task_attachments WHERE id = ?")->execute([$attId]);
+            echo json_encode(['success' => true, 'message' => 'Attachment removed.']);
+            break;
+
+        case 'superadmin_task_project_analytics':
+            checkAuth('reports');
+            $user = getCurrentUser();
+            if (($user['role'] ?? '') !== 'Super Admin') {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only Super Admin can view Super Admin Task & Project analytics.']);
+                exit;
+            }
+
+            $mode = strtolower(trim($_GET['mode'] ?? ($input['mode'] ?? 'month')));
+            if (!in_array($mode, ['day', 'month', 'range'], true)) {
+                $mode = 'month';
+            }
+
+            $dateParam = trim($_GET['date'] ?? ($input['date'] ?? date('Y-m-d')));
+            $monthParam = trim($_GET['month'] ?? ($input['month'] ?? date('Y-m')));
+            $startParam = trim($_GET['start_date'] ?? ($input['start_date'] ?? date('Y-m-01')));
+            $endParam = trim($_GET['end_date'] ?? ($input['end_date'] ?? date('Y-m-d')));
+
+            if ($mode === 'day') {
+                $dTs = strtotime($dateParam) ?: time();
+                $startDate = date('Y-m-d', $dTs);
+                $endDate = $startDate;
+            } elseif ($mode === 'month') {
+                $mTs = strtotime($monthParam . '-01') ?: time();
+                $startDate = date('Y-m-01', $mTs);
+                $endDate = date('Y-m-t', $mTs);
+            } else {
+                $sTs = strtotime($startParam) ?: strtotime(date('Y-m-01'));
+                $eTs = strtotime($endParam) ?: time();
+                if ($sTs > $eTs) {
+                    $tmp = $sTs;
+                    $sTs = $eTs;
+                    $eTs = $tmp;
+                }
+                $startDate = date('Y-m-d', $sTs);
+                $endDate = date('Y-m-d', $eTs);
+            }
+            $rangeStartTs = strtotime($startDate . ' 00:00:00');
+            $rangeEndTs = strtotime($endDate . ' 23:59:59');
+
+            // 1. Employee Completed Tasks in Selected Day / Month / Date Range
+            $staffMap = [];
+            $stStaff = $db->query("
+                SELECT u.id, u.full_name, u.department, COALESCE(r.name, 'Employee') as role_name
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                WHERE COALESCE(u.is_active, 1) = 1 AND u.role_id != 7
+                ORDER BY u.full_name ASC
+            ");
+            foreach ($stStaff->fetchAll() as $su) {
+                $uid = intval($su['id']);
+                $staffMap[$uid] = [
+                    'user_id' => $uid,
+                    'full_name' => $su['full_name'],
+                    'department' => $su['department'] ?: 'General',
+                    'role_name' => $su['role_name'],
+                    'completed_count' => 0,
+                    'main_tasks_completed' => 0,
+                    'subtasks_completed' => 0,
+                    'tasks' => []
+                ];
+            }
+
+            $relAssignMap = [];
+            try {
+                $stRel = $db->query("SELECT task_id, user_id FROM task_assignments WHERE role_type = 'assignee'");
+                foreach ($stRel->fetchAll() as $ra) {
+                    $relAssignMap[intval($ra['task_id'])][] = intval($ra['user_id']);
+                }
+            } catch (Exception $eRel) {}
+
+            $stCompleted = $db->query("
+                SELECT t.id, t.task_code, t.title, t.task_type, t.parent_task_id, t.assigned_to, t.assignees_json,
+                       t.completion_time, t.client_approved_at, t.updated_at, t.created_at, p.project_name
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.is_deleted = 0 AND t.status = 'COMPLETED'
+                ORDER BY COALESCE(t.completion_time, t.updated_at, t.created_at) DESC
+            ");
+
+            $totalCompletedInRange = 0;
+            $dailyMap = [];
+
+            foreach ($stCompleted->fetchAll() as $ct) {
+                $compStr = !empty($ct['completion_time']) ? $ct['completion_time'] : (!empty($ct['client_approved_at']) ? $ct['client_approved_at'] : ($ct['updated_at'] ?: $ct['created_at']));
+                $compTs = strtotime($compStr);
+                if (!$compTs || $compTs < $rangeStartTs || $compTs > $rangeEndTs) {
+                    continue;
+                }
+
+                $totalCompletedInRange++;
+                $dayKey = date('Y-m-d', $compTs);
+                $dailyMap[$dayKey] = ($dailyMap[$dayKey] ?? 0) + 1;
+
+                $tid = intval($ct['id']);
+                $isSub = ($ct['task_type'] === 'subtask' || intval($ct['parent_task_id'] ?? 0) > 0);
+                $assigneeUids = [];
+                if (intval($ct['assigned_to'] ?? 0) > 0) $assigneeUids[] = intval($ct['assigned_to']);
+                $dec = json_decode($ct['assignees_json'] ?? '[]', true);
+                if (is_array($dec)) {
+                    foreach ($dec as $duid) $assigneeUids[] = intval($duid);
+                }
+                if (!empty($relAssignMap[$tid])) {
+                    foreach ($relAssignMap[$tid] as $ruid) $assigneeUids[] = intval($ruid);
+                }
+                $assigneeUids = array_values(array_unique(array_filter($assigneeUids, function ($x) { return $x > 0; })));
+
+                foreach ($assigneeUids as $auid) {
+                    if (!isset($staffMap[$auid])) continue;
+                    $staffMap[$auid]['completed_count']++;
+                    if ($isSub) {
+                        $staffMap[$auid]['subtasks_completed']++;
+                    } else {
+                        $staffMap[$auid]['main_tasks_completed']++;
+                    }
+                    $staffMap[$auid]['tasks'][] = [
+                        'id' => $tid,
+                        'task_code' => $ct['task_code'],
+                        'title' => $ct['title'],
+                        'project_name' => $ct['project_name'] ?: '',
+                        'completed_at' => date('Y-m-d H:i', $compTs)
+                    ];
+                }
+            }
+
+            $employeeCompletions = array_values($staffMap);
+            usort($employeeCompletions, function ($a, $b) {
+                if ($b['completed_count'] !== $a['completed_count']) {
+                    return $b['completed_count'] - $a['completed_count'];
+                }
+                return strcmp($a['full_name'], $b['full_name']);
+            });
+
+            ksort($dailyMap);
+            $dailyBreakdown = [];
+            foreach ($dailyMap as $dKey => $dCnt) {
+                $dailyBreakdown[] = ['date' => $dKey, 'completed_count' => $dCnt];
+            }
+
+            // 2. Project Completion Time Tracking
+            $stProjs = $db->query("
+                SELECT p.*, c.company_name, u_tl.full_name as team_lead_name,
+                       (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.is_deleted = 0) as total_tasks,
+                       (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.is_deleted = 0 AND t.status = 'COMPLETED') as completed_tasks,
+                       (SELECT MAX(COALESCE(t.completion_time, t.updated_at)) FROM tasks t WHERE t.project_id = p.id AND t.is_deleted = 0 AND t.status = 'COMPLETED') as last_task_completed_at
+                FROM projects p
+                LEFT JOIN clients c ON p.client_id = c.id
+                LEFT JOIN users u_tl ON p.team_lead_id = u_tl.id
+                ORDER BY p.id DESC
+            ");
+
+            $projectDurations = [];
+            $completedProjectsCount = 0;
+            $completedDurationSumSec = 0;
+            $onTimeCount = 0;
+            $overdueCount = 0;
+            $nowTs = time();
+
+            foreach ($stProjs->fetchAll() as $p) {
+                $isCompleted = (strtolower(trim($p['status'] ?? '')) === 'completed') || (intval($p['client_approved'] ?? 0) === 1);
+                $startRaw = !empty($p['start_date']) ? $p['start_date'] : ($p['created_at'] ?? date('Y-m-d H:i:s'));
+                $startTs = strtotime($startRaw) ?: $nowTs;
+
+                if ($isCompleted) {
+                    $endRaw = !empty($p['client_approved_at']) ? $p['client_approved_at'] : (!empty($p['last_task_completed_at']) ? $p['last_task_completed_at'] : ($p['updated_at'] ?? date('Y-m-d H:i:s')));
+                    $endTs = strtotime($endRaw) ?: $nowTs;
+                    if ($endTs < $startTs) $endTs = $startTs;
+                    $completedProjectsCount++;
+                    $completedDurationSumSec += ($endTs - $startTs);
+                } else {
+                    $endRaw = null;
+                    $endTs = max($startTs, $nowTs);
+                }
+
+                $durSec = max(0, $endTs - $startTs);
+                $durHours = round($durSec / 3600, 1);
+                $durDays = round($durSec / 86400, 1);
+                $daysWhole = intval(floor($durSec / 86400));
+                $remHours = intval(floor(($durSec % 86400) / 3600));
+                $durLabel = $daysWhole > 0 ? "{$daysWhole}d {$remHours}h" : ($durHours > 0 ? "{$durHours}h" : "< 1h");
+
+                $slaState = $isCompleted ? 'Completed' : 'In Progress';
+                if (!empty($p['deadline'])) {
+                    $dlTs = strtotime(substr($p['deadline'], 0, 10) . ' 23:59:59');
+                    if ($dlTs) {
+                        if ($isCompleted) {
+                            $slaState = ($endTs <= $dlTs) ? 'On Time' : 'Overdue';
+                            if ($endTs <= $dlTs) $onTimeCount++; else $overdueCount++;
+                        } else {
+                            $slaState = ($nowTs <= $dlTs) ? 'Active (On Track)' : 'Active (Overdue)';
+                        }
+                    }
+                } elseif ($isCompleted) {
+                    $slaState = 'On Time';
+                    $onTimeCount++;
+                }
+
+                $projectDurations[] = [
+                    'project_id' => intval($p['id']),
+                    'project_name' => $p['project_name'],
+                    'company_name' => $p['company_name'] ?: 'N/A',
+                    'team_lead_name' => $p['team_lead_name'] ?: 'Unassigned',
+                    'status' => $p['status'],
+                    'is_completed' => $isCompleted,
+                    'start_date' => substr($startRaw, 0, 10),
+                    'deadline' => !empty($p['deadline']) ? substr($p['deadline'], 0, 10) : '--',
+                    'completed_at' => $endRaw ? date('Y-m-d H:i', $endTs) : 'Active',
+                    'duration_hours' => $durHours,
+                    'duration_days' => $durDays,
+                    'duration_label' => $durLabel,
+                    'total_tasks' => intval($p['total_tasks']),
+                    'completed_tasks' => intval($p['completed_tasks']),
+                    'sla_status' => $slaState
+                ];
+            }
+
+            $avgHours = $completedProjectsCount > 0 ? round(($completedDurationSumSec / $completedProjectsCount) / 3600, 1) : 0;
+            $avgDays = $completedProjectsCount > 0 ? round(($completedDurationSumSec / $completedProjectsCount) / 86400, 1) : 0;
+
+            echo json_encode([
+                'success' => true,
+                'filter' => [
+                    'mode' => $mode,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'date' => $dateParam,
+                    'month' => $monthParam
+                ],
+                'summary' => [
+                    'total_completed_tasks' => $totalCompletedInRange,
+                    'active_employees_with_completions' => count(array_filter($employeeCompletions, function ($e) { return $e['completed_count'] > 0; })),
+                    'total_staff' => count($employeeCompletions)
+                ],
+                'employee_completions' => $employeeCompletions,
+                'daily_breakdown' => $dailyBreakdown,
+                'project_duration_summary' => [
+                    'total_projects' => count($projectDurations),
+                    'completed_projects' => $completedProjectsCount,
+                    'avg_completion_hours' => $avgHours,
+                    'avg_completion_days' => $avgDays,
+                    'on_time_count' => $onTimeCount,
+                    'overdue_count' => $overdueCount
+                ],
+                'project_durations' => $projectDurations
+            ]);
             break;
 
         default:

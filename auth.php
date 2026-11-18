@@ -49,6 +49,13 @@ function loginUser($username, $password, $requiredModule = null) {
         }
     }
 
+    // Sales team does not need access to Task Management dashboard/module
+    if (stripos($user['role_name'] ?? '', 'Sales') !== false && $user['role_name'] !== 'Super Admin') {
+        $allowedModules = array_values(array_filter($allowedModules, function ($m) {
+            return $m !== 'task-management';
+        }));
+    }
+
     // Backend Module Permission Enforcement
     if ($requiredModule && !in_array($requiredModule, $allowedModules) && $user['role_name'] !== 'Super Admin') {
         return [
@@ -87,6 +94,19 @@ function getCurrentUser() {
 }
 
 /**
+ * Check if current user has a Sales role (non-Super Admin)
+ */
+function isSalesUser($user = null) {
+    if ($user === null) $user = getCurrentUser();
+    if (!$user) return false;
+    $role = trim($user['role'] ?? ($user['role_name'] ?? ''));
+    if (in_array($role, ['Super Admin', 'System Super Admin'], true) || intval($user['role_id'] ?? 0) === 1) {
+        return false;
+    }
+    return stripos($role, 'Sales') !== false;
+}
+
+/**
  * Check if current user has access to a specific module code
  */
 function hasModuleAccess($moduleCode) {
@@ -96,6 +116,11 @@ function hasModuleAccess($moduleCode) {
     // Super Admin has unrestricted access to all modules
     if (isset($user['role']) && $user['role'] === 'Super Admin') {
         return true;
+    }
+
+    // Sales team does not see or access the Task Management module/dashboard
+    if ($moduleCode === 'task-management' && isSalesUser($user)) {
+        return false;
     }
 
     // Admin / User Management restriction
@@ -561,5 +586,584 @@ function autoProvisionClientUser($db, $clientId, $customUsername = null, $custom
         'is_existing' => false
     ];
 }
+
+function ensureProjectWorkflowSchema($db = null) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    if (!$db) $db = getDbConnection();
+    // Skip DDL write locks when already migrated (crucial for SQLite concurrency)
+    if (!defined('DB_TYPE') || DB_TYPE !== 'mysql') {
+        try {
+            $hasProjCol = false;
+            $hasProjObsCol = false;
+            $hasProjWorkCol = false;
+            foreach ($db->query("PRAGMA table_info(projects)")->fetchAll() as $col) {
+                if (($col['name'] ?? '') === 'client_approved_at') $hasProjCol = true;
+                if (($col['name'] ?? '') === 'observers_json') $hasProjObsCol = true;
+                if (($col['name'] ?? '') === 'working_employees_json') $hasProjWorkCol = true;
+            }
+            $hasTaskCol = false;
+            $hasTaskLeadCol = false;
+            foreach ($db->query("PRAGMA table_info(tasks)")->fetchAll() as $col) {
+                if (($col['name'] ?? '') === 'client_approved_at') $hasTaskCol = true;
+                if (($col['name'] ?? '') === 'lead_approved_at') $hasTaskLeadCol = true;
+            }
+            $hasTbl = (bool)$db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='project_handlers'")->fetchColumn();
+            $hasMembersTbl = (bool)$db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='project_members'")->fetchColumn();
+            $hasAttachCol = false;
+            foreach ($db->query("PRAGMA table_info(task_attachments)")->fetchAll() as $col) {
+                if (($col['name'] ?? '') === 'attachment_stage') { $hasAttachCol = true; break; }
+            }
+            if ($hasProjCol && $hasProjObsCol && $hasProjWorkCol && $hasTaskCol && $hasTaskLeadCol && $hasTbl && $hasMembersTbl && $hasAttachCol) {
+                return;
+            }
+        } catch (Exception $e) {}
+    }
+    try {
+        if (defined('DB_TYPE') && DB_TYPE === 'mysql') {
+            $db->exec("CREATE TABLE IF NOT EXISTS project_handlers (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                project_id INT NOT NULL,
+                user_id INT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_proj_handler (project_id, user_id)
+            )");
+            $db->exec("CREATE TABLE IF NOT EXISTS project_members (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                project_id INT NOT NULL,
+                user_id INT NOT NULL,
+                added_by INT DEFAULT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_proj_member (project_id, user_id),
+                INDEX idx_proj_member_user (user_id)
+            )");
+            $db->exec("CREATE TABLE IF NOT EXISTS task_attachments (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                task_id INT NOT NULL,
+                user_id INT DEFAULT NULL,
+                uploaded_by INT NOT NULL,
+                file_name VARCHAR(255) NOT NULL,
+                file_url VARCHAR(500) NOT NULL,
+                file_path VARCHAR(500) DEFAULT '',
+                mime_type VARCHAR(120) DEFAULT '',
+                file_size BIGINT DEFAULT 0,
+                caption TEXT,
+                attachment_stage VARCHAR(50) DEFAULT 'work',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS project_handlers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(project_id, user_id)
+            )");
+            $db->exec("CREATE TABLE IF NOT EXISTS project_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                added_by INTEGER DEFAULT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(project_id, user_id)
+            )");
+            $db->exec("CREATE TABLE IF NOT EXISTS task_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                user_id INTEGER DEFAULT NULL,
+                uploaded_by INTEGER NOT NULL,
+                file_name TEXT NOT NULL,
+                file_url TEXT NOT NULL,
+                file_path TEXT DEFAULT '',
+                mime_type TEXT DEFAULT '',
+                file_size INTEGER DEFAULT 0,
+                caption TEXT,
+                attachment_stage TEXT DEFAULT 'work',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+        }
+    } catch (Exception $e) {}
+
+    $attachCols = [
+        "ALTER TABLE task_attachments ADD COLUMN user_id INTEGER DEFAULT NULL",
+        "ALTER TABLE task_attachments ADD COLUMN file_path TEXT DEFAULT ''",
+        "ALTER TABLE task_attachments ADD COLUMN mime_type TEXT DEFAULT ''",
+        "ALTER TABLE task_attachments ADD COLUMN caption TEXT",
+        "ALTER TABLE task_attachments ADD COLUMN attachment_stage VARCHAR(50) DEFAULT 'work'"
+    ];
+    foreach ($attachCols as $sql) {
+        try { $db->exec($sql); } catch (Exception $e) {}
+    }
+
+    $projectCols = [
+        "ALTER TABLE projects ADD COLUMN handlers_json TEXT",
+        "ALTER TABLE projects ADD COLUMN working_employees_json TEXT",
+        "ALTER TABLE projects ADD COLUMN observers_json TEXT",
+        "ALTER TABLE projects ADD COLUMN client_approved INTEGER DEFAULT 0",
+        "ALTER TABLE projects ADD COLUMN client_approved_by INTEGER DEFAULT NULL",
+        "ALTER TABLE projects ADD COLUMN client_approved_at DATETIME DEFAULT NULL"
+    ];
+    foreach ($projectCols as $sql) {
+        try { $db->exec($sql); } catch (Exception $e) {}
+    }
+
+    $taskCols = [
+        "ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN task_type VARCHAR(20) DEFAULT 'task'",
+        "ALTER TABLE tasks ADD COLUMN handler_approved INTEGER DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN handler_approved_by INTEGER DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN handler_approved_at DATETIME DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN lead_approved INTEGER DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN lead_approved_by INTEGER DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN lead_approved_at DATETIME DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN client_approved_by_handler INTEGER DEFAULT 0",
+        "ALTER TABLE tasks ADD COLUMN client_approved_by INTEGER DEFAULT NULL",
+        "ALTER TABLE tasks ADD COLUMN client_approved_at DATETIME DEFAULT NULL"
+    ];
+    foreach ($taskCols as $sql) {
+        try { $db->exec($sql); } catch (Exception $e) {}
+    }
+
+    // Backfill default observers (Lead, Super Admin, CRM) onto existing projects & tasks cleanly during migration
+    try {
+        $projs = $db->query("SELECT id, team_lead_id, observers_json FROM projects")->fetchAll();
+        foreach ($projs as $p) {
+            $curObs = json_decode($p['observers_json'] ?? '[]', true);
+            if (!is_array($curObs)) $curObs = [];
+            $defaultObs = getDefaultProjectObserverIds($db, intval($p['team_lead_id'] ?? 0));
+            $mergedObs = array_values(array_unique(array_merge(array_map('intval', $curObs), $defaultObs)));
+            if (json_encode($mergedObs) !== ($p['observers_json'] ?? '')) {
+                $db->prepare("UPDATE projects SET observers_json = ? WHERE id = ?")->execute([json_encode($mergedObs), intval($p['id'])]);
+            }
+        }
+    } catch (Exception $e) {}
+}
+
+function getProjectHandlerIds($db, $projectId) {
+    $pid = intval($projectId);
+    if ($pid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $ids = [];
+    try {
+        $st = $db->prepare("SELECT user_id FROM project_handlers WHERE project_id = ?");
+        $st->execute([$pid]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            if (intval($uid) > 0) $ids[] = intval($uid);
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stP = $db->prepare("SELECT handlers_json FROM projects WHERE id = ?");
+        $stP->execute([$pid]);
+        $row = $stP->fetch();
+        if ($row && !empty($row['handlers_json'])) {
+            $arr = json_decode($row['handlers_json'], true);
+            if (is_array($arr)) {
+                foreach ($arr as $uid) {
+                    if (intval($uid) > 0) $ids[] = intval($uid);
+                }
+            }
+        }
+    } catch (Exception $e) {}
+
+    return array_values(array_unique($ids));
+}
+
+function isProjectHandler($db, $projectId, $userId = null) {
+    if ($userId === null) {
+        $u = getCurrentUser();
+        $userId = $u['id'] ?? 0;
+    }
+    $uid = intval($userId);
+    $pid = intval($projectId);
+    if ($uid <= 0 || $pid <= 0) return false;
+    return in_array($uid, getProjectHandlerIds($db, $pid), true);
+}
+
+function getUserHandledProjectIds($db, $userId = null) {
+    if ($userId === null) {
+        $u = getCurrentUser();
+        $userId = $u['id'] ?? 0;
+    }
+    $uid = intval($userId);
+    if ($uid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $pids = [];
+    try {
+        $st = $db->prepare("SELECT project_id FROM project_handlers WHERE user_id = ?");
+        $st->execute([$uid]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $pid) {
+            if (intval($pid) > 0) $pids[] = intval($pid);
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stP = $db->prepare("SELECT id, handlers_json FROM projects");
+        $stP->execute();
+        while ($row = $stP->fetch()) {
+            $pid = intval($row['id']);
+            $arr = json_decode($row['handlers_json'] ?? '[]', true);
+            if (is_array($arr) && in_array($uid, array_map('intval', $arr), true)) {
+                $pids[] = $pid;
+            }
+        }
+    } catch (Exception $e) {}
+
+    return array_values(array_unique($pids));
+}
+
+function canManageProject($db, $projectId, $userId = null) {
+    if (isLeadOrAdmin()) return true;
+    return isProjectHandler($db, $projectId, $userId);
+}
+
+function syncProjectHandlers($db, $projectId, $handlerIds) {
+    $pid = intval($projectId);
+    if ($pid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', (array)$handlerIds), function ($x) {
+        return $x > 0;
+    })));
+    try {
+        $db->prepare("UPDATE projects SET handlers_json = ? WHERE id = ?")->execute([json_encode($cleanIds), $pid]);
+    } catch (Exception $e) {}
+    try {
+        $db->prepare("DELETE FROM project_handlers WHERE project_id = ?")->execute([$pid]);
+        $ins = $db->prepare("INSERT INTO project_handlers (project_id, user_id) VALUES (?, ?)");
+        foreach ($cleanIds as $uid) {
+            $ins->execute([$pid, $uid]);
+        }
+    } catch (Exception $e) {}
+    return $cleanIds;
+}
+
+function getProjectWorkingEmployeeIds($db, $projectId) {
+    $pid = intval($projectId);
+    if ($pid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $ids = [];
+    try {
+        $st = $db->prepare("SELECT user_id FROM project_members WHERE project_id = ?");
+        $st->execute([$pid]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            if (intval($uid) > 0) $ids[] = intval($uid);
+        }
+    } catch (Exception $e) {}
+
+    try {
+        $stP = $db->prepare("SELECT working_employees_json FROM projects WHERE id = ?");
+        $stP->execute([$pid]);
+        $row = $stP->fetch();
+        if ($row && !empty($row['working_employees_json'])) {
+            $arr = json_decode($row['working_employees_json'], true);
+            if (is_array($arr)) {
+                foreach ($arr as $uid) {
+                    if (intval($uid) > 0) $ids[] = intval($uid);
+                }
+            }
+        }
+    } catch (Exception $e) {}
+
+    return array_values(array_unique($ids));
+}
+
+function syncProjectWorkingEmployees($db, $projectId, $memberIds, $addedBy = null) {
+    $pid = intval($projectId);
+    if ($pid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', (array)$memberIds), function ($x) {
+        return $x > 0;
+    })));
+    try {
+        $db->prepare("UPDATE projects SET working_employees_json = ? WHERE id = ?")->execute([json_encode($cleanIds), $pid]);
+    } catch (Exception $e) {}
+    try {
+        $db->prepare("DELETE FROM project_members WHERE project_id = ?")->execute([$pid]);
+        $ins = $db->prepare("INSERT INTO project_members (project_id, user_id, added_by) VALUES (?, ?, ?)");
+        foreach ($cleanIds as $uid) {
+            try { $ins->execute([$pid, $uid, $addedBy ? intval($addedBy) : null]); } catch (Exception $eIns) {}
+        }
+    } catch (Exception $e) {}
+    return $cleanIds;
+}
+
+function getUserWorkingProjectIds($db, $userId = null) {
+    if ($userId === null) {
+        $u = getCurrentUser();
+        $userId = $u['id'] ?? 0;
+    }
+    $uid = intval($userId);
+    if ($uid <= 0) return [];
+    ensureProjectWorkflowSchema($db);
+    $pids = [];
+    try {
+        $st = $db->prepare("SELECT project_id FROM project_members WHERE user_id = ?");
+        $st->execute([$uid]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $pid) {
+            if (intval($pid) > 0) $pids[] = intval($pid);
+        }
+    } catch (Exception $e) {}
+    try {
+        $stP = $db->prepare("SELECT id, working_employees_json FROM projects");
+        $stP->execute();
+        while ($row = $stP->fetch()) {
+            $pid = intval($row['id']);
+            $arr = json_decode($row['working_employees_json'] ?? '[]', true);
+            if (is_array($arr) && in_array($uid, array_map('intval', $arr), true)) {
+                $pids[] = $pid;
+            }
+        }
+    } catch (Exception $e) {}
+    return array_values(array_unique($pids));
+}
+
+/**
+ * Default observers automatically attached to every project:
+ * Team Lead / DM Lead (plus specific $teamLeadId), Super Admin, and CRM.
+ * Regular employees are never added here so strict task isolation remains intact.
+ */
+function getDefaultProjectObserverIds($db, $teamLeadId = 0) {
+    $ids = [];
+    if (intval($teamLeadId) > 0) {
+        $ids[] = intval($teamLeadId);
+    }
+    try {
+        $stmt = $db->query("
+            SELECT u.id
+            FROM users u
+            JOIN roles r ON u.role_id = r.id
+            WHERE COALESCE(u.is_active, 1) = 1
+              AND r.name IN ('Super Admin', 'CRM', 'Team Lead', 'DM Lead')
+        ");
+        while ($row = $stmt->fetch()) {
+            $uid = intval($row['id'] ?? 0);
+            if ($uid > 0) $ids[] = $uid;
+        }
+    } catch (Exception $e) {}
+    return array_values(array_unique(array_filter($ids, function ($x) { return $x > 0; })));
+}
+
+/**
+ * Return merged list of project observer IDs (saved observers_json + default Lead/SuperAdmin/CRM observers).
+ */
+function getProjectObserverIds($db, $projectId, $teamLeadId = 0) {
+    $pid = intval($projectId);
+    $saved = [];
+    $projLeadId = intval($teamLeadId);
+    if ($pid > 0) {
+        try {
+            $stmt = $db->prepare("SELECT team_lead_id, observers_json FROM projects WHERE id = ?");
+            $stmt->execute([$pid]);
+            $p = $stmt->fetch();
+            if ($p) {
+                if ($projLeadId <= 0) $projLeadId = intval($p['team_lead_id'] ?? 0);
+                $decoded = json_decode($p['observers_json'] ?? '[]', true);
+                if (is_array($decoded)) {
+                    $saved = array_map('intval', $decoded);
+                }
+            }
+        } catch (Exception $e) {}
+    }
+    $defaults = getDefaultProjectObserverIds($db, $projLeadId);
+    return array_values(array_unique(array_filter(array_merge($saved, $defaults), function ($x) { return $x > 0; })));
+}
+
+function isSuperAdminUser($user = null) {
+    if ($user === null) $user = getCurrentUser();
+    if (!$user) return false;
+    $role = $user['role'] ?? ($user['role_name'] ?? '');
+    $roleId = intval($user['role_id'] ?? 0);
+    return in_array($role, ['Super Admin', 'System Super Admin'], true) || $roleId === 1;
+}
+
+function ensureOperationsSchema($db = null) {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    if (!$db) $db = getDbConnection();
+    try {
+        if (defined('DB_TYPE') && DB_TYPE === 'mysql') {
+            $db->exec("CREATE TABLE IF NOT EXISTS shoot_schedules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                client_id INT DEFAULT NULL,
+                client_name VARCHAR(255) NOT NULL,
+                shoot_date DATETIME NOT NULL,
+                videos_planned INT DEFAULT 1,
+                scripts_approved VARCHAR(50) DEFAULT 'Pending',
+                shoot_venue VARCHAR(255) DEFAULT '',
+                venue_blocked_status VARCHAR(100) DEFAULT 'Pending from Venue Side',
+                client_participants_count INT DEFAULT 0,
+                shoot_type VARCHAR(100) NOT NULL,
+                assigned_employees_json TEXT DEFAULT NULL,
+                status VARCHAR(50) DEFAULT 'Scheduled',
+                notes TEXT DEFAULT NULL,
+                created_by INT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_shoot_date (shoot_date),
+                INDEX idx_shoot_client (client_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS shoot_assignments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                shoot_id INT NOT NULL,
+                user_id INT NOT NULL,
+                role_note VARCHAR(100) DEFAULT 'Team Member',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_shoot_user (shoot_id, user_id),
+                INDEX idx_shoot_assign_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS domain_server_renewals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                client_id INT DEFAULT NULL,
+                client_name VARCHAR(255) NOT NULL,
+                contact_number VARCHAR(50) DEFAULT '',
+                domain_name VARCHAR(255) NOT NULL,
+                domain_expiry DATE DEFAULT NULL,
+                domain_charges DECIMAL(10,2) DEFAULT 0.00,
+                server_expiry DATE DEFAULT NULL,
+                server_charges DECIMAL(10,2) DEFAULT 0.00,
+                assigned_employees_json TEXT DEFAULT NULL,
+                renewal_status VARCHAR(50) DEFAULT 'Active',
+                hosting_provider VARCHAR(150) DEFAULT '',
+                notes TEXT DEFAULT NULL,
+                created_by INT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_domain_expiry (domain_expiry),
+                INDEX idx_server_expiry (server_expiry),
+                INDEX idx_renewal_client (client_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS renewal_assignments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                renewal_id INT NOT NULL,
+                user_id INT NOT NULL,
+                role_note VARCHAR(100) DEFAULT 'Assigned Incharge',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_renewal_user (renewal_id, user_id),
+                INDEX idx_renewal_assign_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS shoot_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER DEFAULT NULL,
+                client_name TEXT NOT NULL,
+                shoot_date DATETIME NOT NULL,
+                videos_planned INTEGER DEFAULT 1,
+                scripts_approved TEXT DEFAULT 'Pending',
+                shoot_venue TEXT DEFAULT '',
+                venue_blocked_status TEXT DEFAULT 'Pending from Venue Side',
+                client_participants_count INTEGER DEFAULT 0,
+                shoot_type TEXT NOT NULL,
+                assigned_employees_json TEXT DEFAULT NULL,
+                status TEXT DEFAULT 'Scheduled',
+                notes TEXT DEFAULT NULL,
+                created_by INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS shoot_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shoot_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role_note TEXT DEFAULT 'Team Member',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(shoot_id, user_id)
+            )");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS domain_server_renewals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER DEFAULT NULL,
+                client_name TEXT NOT NULL,
+                contact_number TEXT DEFAULT '',
+                domain_name TEXT NOT NULL,
+                domain_expiry DATE DEFAULT NULL,
+                domain_charges REAL DEFAULT 0.00,
+                server_expiry DATE DEFAULT NULL,
+                server_charges REAL DEFAULT 0.00,
+                assigned_employees_json TEXT DEFAULT NULL,
+                renewal_status TEXT DEFAULT 'Active',
+                hosting_provider TEXT DEFAULT '',
+                notes TEXT DEFAULT NULL,
+                created_by INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS renewal_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                renewal_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role_note TEXT DEFAULT 'Assigned Incharge',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(renewal_id, user_id)
+            )");
+        }
+    } catch (Exception $e) {}
+}
+
+function syncShootAssignments($db, $shootId, $userIds) {
+    $sid = intval($shootId);
+    if ($sid <= 0) return;
+    ensureOperationsSchema($db);
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', (array)$userIds), function ($x) { return $x > 0; })));
+    try {
+        $db->prepare("DELETE FROM shoot_assignments WHERE shoot_id = ?")->execute([$sid]);
+        if (!empty($cleanIds)) {
+            $stmt = $db->prepare("INSERT INTO shoot_assignments (shoot_id, user_id, role_note) VALUES (?, ?, 'Team Member')");
+            foreach ($cleanIds as $uid) {
+                try { $stmt->execute([$sid, $uid]); } catch (Exception $e) {}
+            }
+        }
+        $db->prepare("UPDATE shoot_schedules SET assigned_employees_json = ? WHERE id = ?")->execute([json_encode($cleanIds), $sid]);
+    } catch (Exception $e) {}
+}
+
+function syncRenewalAssignments($db, $renewalId, $userIds) {
+    $rid = intval($renewalId);
+    if ($rid <= 0) return;
+    ensureOperationsSchema($db);
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', (array)$userIds), function ($x) { return $x > 0; })));
+    try {
+        $db->prepare("DELETE FROM renewal_assignments WHERE renewal_id = ?")->execute([$rid]);
+        if (!empty($cleanIds)) {
+            $stmt = $db->prepare("INSERT INTO renewal_assignments (renewal_id, user_id, role_note) VALUES (?, ?, 'Assigned Incharge')");
+            foreach ($cleanIds as $uid) {
+                try { $stmt->execute([$rid, $uid]); } catch (Exception $e) {}
+            }
+        }
+        $db->prepare("UPDATE domain_server_renewals SET assigned_employees_json = ? WHERE id = ?")->execute([json_encode($cleanIds), $rid]);
+    } catch (Exception $e) {}
+}
+
+function canAccessOperations($user = null, $db = null) {
+    if ($user === null) $user = getCurrentUser();
+    if (!$user) return false;
+    if (isSuperAdminUser($user)) return true;
+
+    if (!$db) $db = getDbConnection();
+    ensureOperationsSchema($db);
+    $uid = intval($user['id'] ?? 0);
+    if ($uid <= 0) return false;
+
+    try {
+        $chkShoot = $db->prepare("SELECT 1 FROM shoot_assignments WHERE user_id = ? LIMIT 1");
+        $chkShoot->execute([$uid]);
+        if ($chkShoot->fetchColumn()) return true;
+
+        $chkRen = $db->prepare("SELECT 1 FROM renewal_assignments WHERE user_id = ? LIMIT 1");
+        $chkRen->execute([$uid]);
+        if ($chkRen->fetchColumn()) return true;
+    } catch (Exception $e) {}
+
+    return false;
+}
+
 
 

@@ -14,12 +14,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please provide Hostinger Database Name and Database Username.";
     } else {
         try {
-            // Test Connection to Hostinger MySQL
-            $dsn = "mysql:host={$dbHost};charset=utf8mb4";
-            $pdo = new PDO($dsn, $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-            
-            // Create database if not exists
-            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}`; USE `{$dbName}`;");
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                PDO::MYSQL_ATTR_MULTI_STATEMENTS => true
+            ];
+
+            $pdo = null;
+            try {
+                // Hostinger Shared Hosting standard: connect directly to existing database
+                $dsn = "mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4";
+                $pdo = new PDO($dsn, $dbUser, $dbPass, $options);
+            } catch (Exception $ex) {
+                // Fallback for VPS / root where DB might need creation
+                $dsnNoDb = "mysql:host={$dbHost};charset=utf8mb4";
+                $pdo = new PDO($dsnNoDb, $dbUser, $dbPass, $options);
+                $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}`; USE `{$dbName}`;");
+            }
 
             // Read SQL Dump
             $sqlFile = __DIR__ . '/hostinger_agency_os.sql';
@@ -27,10 +39,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "SQL Dump file hostinger_agency_os.sql not found!";
             } else {
                 $sql = file_get_contents($sqlFile);
-                $pdo->exec($sql);
+                try {
+                    $pdo->exec($sql);
+                } catch (Exception $sqlEx) {
+                    // Split queries if multi-statement limit is hit
+                    $statements = array_filter(array_map('trim', explode(";\n", $sql)));
+                    foreach ($statements as $st) {
+                        if (!empty($st)) {
+                            try { $pdo->exec($st); } catch (Exception $e) {}
+                        }
+                    }
+                }
 
                 // Update db.php file contents first so seed_templates uses the live MySQL connection
                 $dbPhpContent = "<?php\n"
+                    . "// db.php - Database connection helper supporting both Hostinger MySQL & Local SQLite\n\n"
                     . "define('DB_TYPE', 'mysql');\n"
                     . "define('DB_HOST', '" . addslashes($dbHost) . "');\n"
                     . "define('DB_NAME', '" . addslashes($dbName) . "');\n"
@@ -43,7 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . "        \$dsn = \"mysql:host=\" . DB_HOST . \";dbname=\" . DB_NAME . \";charset=utf8mb4\";\n"
                     . "        \$pdo = new PDO(\$dsn, DB_USER, DB_PASS, [\n"
                     . "            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,\n"
-                    . "            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC\n"
+                    . "            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,\n"
+                    . "            PDO::MYSQL_ATTR_INIT_COMMAND => \"SET NAMES utf8mb4\"\n"
                     . "        ]);\n"
                     . "    }\n"
                     . "    return \$pdo;\n"

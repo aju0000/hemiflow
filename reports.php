@@ -5,6 +5,7 @@ require_once __DIR__ . '/auth.php';
 checkAuth('reports');
 
 $user = getCurrentUser();
+$isSuperAdmin = (($user['role'] ?? '') === 'Super Admin');
 $db = getDbConnection();
 
 $pageBreadcrumb = "Module 9";
@@ -72,6 +73,11 @@ require_once __DIR__ . '/header.php';
         <button id="tabBtn4" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(4)">
             Workforce & HR Operations
         </button>
+        <?php if ($isSuperAdmin): ?>
+        <button id="tabBtn5" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(5)">
+            🛡️ Super Admin: Task & Project Time Tracking
+        </button>
+        <?php endif; ?>
     </div>
 
     <!-- TAB 1: Developer Productivity Leaderboard -->
@@ -190,6 +196,97 @@ require_once __DIR__ . '/header.php';
             </table>
         </div>
     </div>
+
+    <?php if ($isSuperAdmin): ?>
+    <!-- TAB 5: Super Admin Task Completion (Day / Month / Date Range) & Project Time Tracking -->
+    <div id="tabContent5" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+            <div>
+                <h3 style="font-size:16px; font-weight:800; color:#0f172a; margin:0 0 4px 0;">🛡️ Super Admin: Employee Completed Tasks Tracker</h3>
+                <p style="font-size:12.5px; color:#64748b; margin:0;">Filter completed tasks per employee by Day, Month, or Custom Date Range.</p>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <button type="button" id="saBtnDay" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('day')">📅 Per Day</button>
+                <button type="button" id="saBtnMonth" class="btn btn-primary btn-sm" onclick="setSaAnalyticsMode('month')">🗓️ Per Month</button>
+                <button type="button" id="saBtnRange" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('range')">📊 Date Range</button>
+
+                <input type="date" id="sa_date" class="form-control" value="<?= date('Y-m-d') ?>" style="display:none; width:150px; padding:5px 8px; font-size:12.5px;">
+                <input type="month" id="sa_month" class="form-control" value="<?= date('Y-m') ?>" style="display:inline-block; width:155px; padding:5px 8px; font-size:12.5px;">
+                <span id="sa_range_inputs" style="display:none; align-items:center; gap:6px;">
+                    <input type="date" id="sa_start_date" class="form-control" value="<?= date('Y-m-01') ?>" style="width:140px; padding:5px 8px; font-size:12.5px;">
+                    <span style="font-size:12px; color:#64748b;">to</span>
+                    <input type="date" id="sa_end_date" class="form-control" value="<?= date('Y-m-d') ?>" style="width:140px; padding:5px 8px; font-size:12.5px;">
+                </span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="loadSuperAdminAnalytics()">Apply Filter</button>
+            </div>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:20px;">
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:14px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase;">Tasks Completed in Period</p>
+                <h2 id="sa_total_completed" style="font-size:24px; font-weight:800; color:#1d4ed8; margin:4px 0;">--</h2>
+                <small id="sa_period_label" style="color:#2563eb; font-size:11.5px;">--</small>
+            </div>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#15803d; text-transform:uppercase;">Employees With Completions</p>
+                <h2 id="sa_active_staff" style="font-size:24px; font-weight:800; color:#16a34a; margin:4px 0;">--</h2>
+                <small style="color:#15803d; font-size:11.5px;">Within Selected Range</small>
+            </div>
+            <div style="background:#fefce8; border:1px solid #fde047; border-radius:8px; padding:14px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#a16207; text-transform:uppercase;">Completed Projects</p>
+                <h2 id="sa_completed_projects" style="font-size:24px; font-weight:800; color:#ca8a04; margin:4px 0;">--</h2>
+                <small id="sa_sla_projects_sub" style="color:#a16207; font-size:11.5px;">--</small>
+            </div>
+            <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:14px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#6b21a8; text-transform:uppercase;">Avg Project Time Taken</p>
+                <h2 id="sa_avg_proj_days" style="font-size:24px; font-weight:800; color:#7e22ce; margin:4px 0;">--</h2>
+                <small id="sa_avg_proj_hours" style="color:#6b21a8; font-size:11.5px;">--</small>
+            </div>
+        </div>
+
+        <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 10px 0;">Employee Completed Tasks Count</h4>
+        <div class="table-responsive" style="margin-bottom:26px;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Role</th>
+                        <th>Completed Tasks</th>
+                        <th>Main Tasks</th>
+                        <th>Sub-Tasks</th>
+                        <th>Recent Completed Task(s)</th>
+                    </tr>
+                </thead>
+                <tbody id="saEmployeeCompletionsBody">
+                    <tr><td colspan="7" style="text-align:center; padding:20px;">Loading employee completion metrics...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 10px 0;">⏱️ Project Completion Time Tracker</h4>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Client</th>
+                        <th>Team Lead</th>
+                        <th>Start Date</th>
+                        <th>Deadline</th>
+                        <th>Completed At</th>
+                        <th>Time Taken</th>
+                        <th>Tasks Done</th>
+                        <th>Status / SLA</th>
+                    </tr>
+                </thead>
+                <tbody id="saProjectDurationsBody">
+                    <tr><td colspan="9" style="text-align:center; padding:20px;">Loading project completion durations...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <!-- MODAL: EXECUTIVE DRILL-DOWN TOOL -->
@@ -320,7 +417,7 @@ require_once __DIR__ . '/header.php';
     }
 
     function switchTab(num) {
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 5; i++) {
             const content = document.getElementById(`tabContent${i}`);
             if (content) content.style.display = i === num ? 'block' : 'none';
             const btn = document.getElementById(`tabBtn${i}`);
@@ -332,7 +429,103 @@ require_once __DIR__ . '/header.php';
         }
         if (num === 4) {
             loadHrBiAnalytics();
+        } else if (num === 5) {
+            loadSuperAdminAnalytics();
         }
+    }
+
+    let saAnalyticsMode = 'month';
+    function setSaAnalyticsMode(mode) {
+        saAnalyticsMode = mode;
+        const map = { day: 'saBtnDay', month: 'saBtnMonth', range: 'saBtnRange' };
+        Object.keys(map).forEach(k => {
+            const b = document.getElementById(map[k]);
+            if (b) b.className = k === mode ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+        });
+        document.getElementById('sa_date').style.display = mode === 'day' ? 'inline-block' : 'none';
+        document.getElementById('sa_month').style.display = mode === 'month' ? 'inline-block' : 'none';
+        document.getElementById('sa_range_inputs').style.display = mode === 'range' ? 'inline-flex' : 'none';
+        loadSuperAdminAnalytics();
+    }
+
+    function escapeReportHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function loadSuperAdminAnalytics() {
+        const params = new URLSearchParams({ action: 'superadmin_task_project_analytics', mode: saAnalyticsMode });
+        if (saAnalyticsMode === 'day') {
+            params.set('date', document.getElementById('sa_date').value);
+        } else if (saAnalyticsMode === 'month') {
+            params.set('month', document.getElementById('sa_month').value);
+        } else {
+            params.set('start_date', document.getElementById('sa_start_date').value);
+            params.set('end_date', document.getElementById('sa_end_date').value);
+        }
+
+        fetch('api.php?' + params.toString())
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert(data.message || 'Could not load Super Admin analytics.');
+                    return;
+                }
+                const s = data.summary || {};
+                const f = data.filter || {};
+                const ps = data.project_duration_summary || {};
+                document.getElementById('sa_total_completed').textContent = s.total_completed_tasks ?? 0;
+                document.getElementById('sa_period_label').textContent = `${f.start_date || ''} → ${f.end_date || ''}`;
+                document.getElementById('sa_active_staff').textContent = `${s.active_employees_with_completions ?? 0} / ${s.total_staff ?? 0}`;
+                document.getElementById('sa_completed_projects').textContent = `${ps.completed_projects ?? 0} / ${ps.total_projects ?? 0}`;
+                document.getElementById('sa_sla_projects_sub').textContent = `On Time: ${ps.on_time_count ?? 0} • Overdue: ${ps.overdue_count ?? 0}`;
+                document.getElementById('sa_avg_proj_days').textContent = `${ps.avg_completion_days ?? 0} Days`;
+                document.getElementById('sa_avg_proj_hours').textContent = `${ps.avg_completion_hours ?? 0} Hours Average`;
+
+                const empBody = document.getElementById('saEmployeeCompletionsBody');
+                const emps = data.employee_completions || [];
+                if (emps.length === 0) {
+                    empBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No employees found.</td></tr>';
+                } else {
+                    empBody.innerHTML = emps.map(e => {
+                        const taskLinks = (e.tasks || []).slice(0, 4).map(t => `<a href="task_details.php?id=${t.id}" class="badge badge-secondary" style="text-decoration:none; margin:2px; font-size:10.5px;">${escapeReportHtml(t.task_code)}: ${escapeReportHtml(t.title)}</a>`).join(' ');
+                        const extra = (e.tasks || []).length > 4 ? ` <small style="color:#64748b;">+${e.tasks.length - 4} more</small>` : '';
+                        return `
+                            <tr>
+                                <td><strong>${escapeReportHtml(e.full_name)}</strong></td>
+                                <td>${escapeReportHtml(e.department)}</td>
+                                <td><span class="badge badge-secondary">${escapeReportHtml(e.role_name)}</span></td>
+                                <td><span class="badge ${e.completed_count > 0 ? 'badge-success' : 'badge-secondary'}" style="font-size:12.5px;">${e.completed_count}</span></td>
+                                <td>${e.main_tasks_completed}</td>
+                                <td>${e.subtasks_completed}</td>
+                                <td>${taskLinks || '<span style="color:#94a3b8;">--</span>'}${extra}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                const projBody = document.getElementById('saProjectDurationsBody');
+                const projs = data.project_durations || [];
+                if (projs.length === 0) {
+                    projBody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:20px;">No projects recorded yet.</td></tr>';
+                } else {
+                    projBody.innerHTML = projs.map(p => {
+                        const slaClass = (p.sla_status === 'On Time' || p.sla_status === 'Active (On Track)') ? 'badge-success' : (p.sla_status.includes('Overdue') ? 'badge-danger' : 'badge-primary');
+                        return `
+                            <tr>
+                                <td><a href="project_details.php?id=${p.project_id}" style="font-weight:700; color:#1d4ed8; text-decoration:none;">${escapeReportHtml(p.project_name)}</a></td>
+                                <td>${escapeReportHtml(p.company_name)}</td>
+                                <td>${escapeReportHtml(p.team_lead_name)}</td>
+                                <td>${escapeReportHtml(p.start_date)}</td>
+                                <td>${escapeReportHtml(p.deadline)}</td>
+                                <td>${escapeReportHtml(p.completed_at)}</td>
+                                <td><strong>${escapeReportHtml(p.duration_label)}</strong> <small style="color:#64748b;">(${p.duration_days}d)</small></td>
+                                <td><span class="badge badge-secondary">${p.completed_tasks} / ${p.total_tasks}</span></td>
+                                <td><span class="badge ${slaClass}">${escapeReportHtml(p.sla_status)}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            });
     }
 
     function loadHrBiAnalytics() {

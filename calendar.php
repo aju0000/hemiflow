@@ -344,8 +344,11 @@ require_once __DIR__ . '/header.php';
                             <option value="PENDING">⏳ Pending</option>
                             <option value="IN PROGRESS">⚡ In Progress</option>
                             <option value="UNDER REVIEW">🔍 Under Review</option>
-                            <option value="REVISION REQUIRED">🔄 Revision Needed</option>
-                            <option value="COMPLETED">✅ Completed</option>
+                            <?php if ($isLead): ?>
+                                <option value="REVISION REQUIRED">🔄 Revision Needed</option>
+                                <option value="SENT FOR CLIENT APPROVAL">📩 Sent for Client Approval</option>
+                                <option value="COMPLETED">✅ Completed</option>
+                            <?php endif; ?>
                         </select>
                     </div>
 
