@@ -869,6 +869,13 @@ function openClientQuickModal(clientId) {
 }
 
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const openParam = new URLSearchParams(window.location.search).get('open');
+    if (openParam === 'add_client' && typeof openAddClientModal === 'function') {
+        setTimeout(() => openAddClientModal(), 120);
+    }
+});
 </script>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

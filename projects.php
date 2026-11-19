@@ -37,56 +37,201 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         align-items: center;
         gap: 14px;
         flex-wrap: wrap;
-        margin-bottom: 20px;
+        margin-bottom: 18px;
     }
     .ws-switcher {
         display: inline-flex;
-        background: #f1f5f9;
-        padding: 5px;
-        border-radius: 14px;
-        border: 1px solid #e2e8f0;
-        gap: 4px;
+        align-items: center;
+        gap: 10px;
     }
     .ws-tab-btn {
-        border: none;
-        background: transparent;
-        padding: 9px 18px;
-        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        padding: 10px 18px;
+        border-radius: 12px;
         font-size: 13.5px;
         font-weight: 700;
-        color: #64748b;
+        color: #334155;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        transition: all 0.2s ease;
+    }
+    .ws-tab-btn:hover {
+        border-color: #c7d2fe;
+        color: #4f46e5;
     }
     .ws-tab-btn.active {
+        background: linear-gradient(135deg, #5b46f6, #7c3aed);
+        border-color: transparent;
+        color: #ffffff;
+        box-shadow: 0 6px 18px rgba(99, 102, 241, 0.32);
+    }
+    .ws-tab-btn.active .ws-count-pill {
+        background: rgba(255, 255, 255, 0.92);
+        color: #4f46e5;
+    }
+    .ws-count-pill {
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 2px 8px;
+        border-radius: 999px;
+        min-width: 22px;
+        text-align: center;
+    }
+    .cp-btn-purple {
+        background: linear-gradient(135deg, #5b46f6, #7c3aed) !important;
+        color: #ffffff !important;
+        border: none !important;
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.28) !important;
+    }
+    .cp-btn-purple:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 22px rgba(99, 102, 241, 0.38) !important;
+    }
+    .cp-filter-bar {
         background: #ffffff;
-        color: #1d4ed8;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        border: 1px solid #f1f5f9;
+        border-radius: 16px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 18px rgba(15, 23, 42, 0.035);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .cp-filter-bar .form-control,
+    .cp-filter-bar .form-select {
+        height: 40px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        font-size: 13px;
+        background-color: #ffffff;
+    }
+    .cp-filter-bar .form-control:focus,
+    .cp-filter-bar .form-select:focus {
+        border-color: #818cf8;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
     }
     .projects-portfolio-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-        gap: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
     }
     .proj-portfolio-card {
         background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 16px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 14px;
-        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+        border: 1px solid #f1f5f9;
+        border-radius: 20px;
+        padding: 24px 26px;
+        box-shadow: 0 6px 24px rgba(15, 23, 42, 0.045);
         transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
     }
     .proj-portfolio-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
-        border-color: #bfdbfe;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+        border-color: #ddd6fe;
+    }
+    .proj-card-body-split {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(290px, 1fr);
+        gap: 28px;
+        align-items: center;
+    }
+    .proj-card-right {
+        border-left: 1px solid #f1f5f9;
+        padding-left: 28px;
+    }
+    @media (max-width: 960px) {
+        .proj-card-body-split {
+            grid-template-columns: 1fr;
+            gap: 18px;
+        }
+        .proj-card-right {
+            border-left: none;
+            border-top: 1px solid #f1f5f9;
+            padding-left: 0;
+            padding-top: 18px;
+        }
+    }
+    .proj-mini-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+    }
+    .proj-mini-stat-box {
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        border-radius: 14px;
+        padding: 13px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .proj-mini-stat-box.stat-done {
+        background: #f0fdf4;
+        border-color: #dcfce7;
+    }
+    .proj-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding-top: 16px;
+        margin-top: 20px;
+        border-top: 1px solid #f1f5f9;
+    }
+    .proj-act-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 15px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: all 0.16s ease;
+    }
+    .proj-act-btn:hover { transform: translateY(-1px); }
+    .proj-act-primary {
+        background: linear-gradient(135deg, #5b46f6, #7c3aed);
+        color: #ffffff;
+        box-shadow: 0 5px 14px rgba(99, 102, 241, 0.28);
+    }
+    .proj-act-mint {
+        background: #ecfdf5;
+        color: #047857;
+        border-color: #bbf7d0;
+    }
+    .proj-act-mint:hover { background: #d1fae5; }
+    .proj-act-violet {
+        background: #f5f3ff;
+        color: #6d28d9;
+        border-color: #ddd6fe;
+    }
+    .proj-act-violet:hover { background: #ede9fe; }
+    .proj-act-sky {
+        background: #eff6ff;
+        color: #0369a1;
+        border-color: #bae6fd;
+    }
+    .proj-act-sky:hover { background: #dbeafe; }
+    .proj-act-neutral {
+        background: #ffffff;
+        color: #334155;
+        border-color: #e2e8f0;
+    }
+    .proj-act-neutral:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
     }
     .cp-comp-row {
         background: #f8fafc;
@@ -101,29 +246,29 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
 <div class="ws-tabs-bar">
     <div class="ws-switcher">
         <button type="button" id="tabBtn_projects" class="ws-tab-btn <?= $activeView === 'projects' ? 'active' : '' ?>" onclick="switchWorkspaceView('projects')">
-            <span>📁</span>
+            <i data-feather="folder" style="width:16px; height:16px;"></i>
             <span>Current Projects List</span>
-            <span id="currentProjCountBadge" class="badge" style="background:#dbeafe; color:#1e40af; font-size:11px; padding:2px 8px;"><?= count(array_filter($projects, fn($pr) => intval($pr['is_current'] ?? 1) === 1)) ?></span>
+            <span id="currentProjCountBadge" class="ws-count-pill"><?= count(array_filter($projects, fn($pr) => intval($pr['is_current'] ?? 1) === 1)) ?></span>
         </button>
         <button type="button" id="tabBtn_tasks" class="ws-tab-btn <?= $activeView === 'tasks' ? 'active' : '' ?>" onclick="switchWorkspaceView('tasks')">
-            <span>📋</span>
+            <i data-feather="check-square" style="width:16px; height:16px;"></i>
             <span>Tasks Workspace</span>
         </button>
     </div>
 
-    <div class="action-pills-row" style="margin-bottom:0;">
+    <div class="action-pills-row" style="margin-bottom:0; gap:10px;">
         <?php if ($isLead): ?>
-            <button class="btn-pill-primary" onclick="openCreateProjectModal()">
-                <i data-feather="folder-plus" class="icon-prefix"></i>
-                <span>+ Add Current Project</span>
+            <button class="btn-pill-primary cp-btn-purple" onclick="openCreateProjectModal()">
+                <i data-feather="plus" style="width:16px; height:16px;"></i>
+                <span>Add Current Project</span>
             </button>
             <button class="btn-pill-white" onclick="openImportProjectsModal()">
-                <i data-feather="upload" class="icon-folder"></i>
-                <span>📥 Import Projects</span>
+                <i data-feather="upload" style="width:15px; height:15px;"></i>
+                <span>Import Projects</span>
             </button>
             <button class="btn-pill-white" onclick="openCreateTaskModal()">
-                <i data-feather="plus" class="icon-tag"></i>
-                <span>+ Create & Assign Task</span>
+                <i data-feather="plus" style="width:15px; height:15px;"></i>
+                <span>Create &amp; Assign Task</span>
             </button>
             <button class="btn-pill-white tasks-only-pill" style="<?= $activeView === 'projects' ? 'display:none;' : '' ?>" onclick="document.getElementById('filterStatus').value=''; loadTasks();">
                 <i data-feather="list" class="icon-clock"></i>
@@ -134,7 +279,7 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
                 <span>Active SLAs</span>
             </button>
         <?php else: ?>
-            <button class="btn-pill-primary" onclick="switchWorkspaceView('tasks'); document.getElementById('filterStatus').value='IN PROGRESS'; loadTasks();">
+            <button class="btn-pill-primary cp-btn-purple" onclick="switchWorkspaceView('tasks'); document.getElementById('filterStatus').value='IN PROGRESS'; loadTasks();">
                 <i data-feather="play-circle" class="icon-prefix"></i>
                 <span>My Active Tasks</span>
                 <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
@@ -151,47 +296,48 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
 <!-- VIEW 1: CURRENT PROJECTS PORTFOLIO LIST (Overview, About & Competitors) -->
 <!-- ====================================================================== -->
 <div id="viewSection_projects" style="display:<?= $activeView === 'projects' ? 'block' : 'none' ?>;">
-    <div class="card" style="padding:16px; margin-bottom:20px;">
-        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-            <div style="flex:2; min-width:220px;">
-                <input type="text" id="projFilterSearch" class="form-control" placeholder="🔍 Search current projects, client, overview..." oninput="debounceLoadProjects()">
-            </div>
-            <div style="flex:1; min-width:170px;">
-                <select id="projFilterCurrent" class="form-select" onchange="loadCurrentProjects()">
-                    <option value="1" selected>Current Projects Only</option>
-                    <option value="">All Projects (Current & Archived)</option>
-                    <option value="0">Archived / Completed Only</option>
-                </select>
-            </div>
-            <div style="flex:1; min-width:170px;">
-                <select id="projFilterClient" class="form-select" onchange="loadCurrentProjects()">
-                    <option value="0">All Clients</option>
-                    <?php foreach ($clients as $c): ?>
-                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['company_name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="flex:1; min-width:160px;">
-                <select id="projFilterDept" class="form-select" onchange="loadCurrentProjects()">
-                    <option value="">All Departments</option>
-                    <?php foreach ($departments as $dept): ?>
-                        <option value="<?= htmlspecialchars($dept['name']) ?>"><?= htmlspecialchars($dept['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button class="btn btn-outline btn-sm" onclick="loadCurrentProjects()">
-                <i data-feather="refresh-cw"></i> Refresh
-            </button>
-            <?php if ($isLead): ?>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openImportProjectsModal()">
-                📥 Import Projects CSV
-            </button>
-            <?php endif; ?>
+    <div class="cp-filter-bar">
+        <div style="flex:2; min-width:220px; position:relative;">
+            <i data-feather="search" style="position:absolute; left:13px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:#94a3b8; pointer-events:none;"></i>
+            <input type="text" id="projFilterSearch" class="form-control" style="padding-left:38px;" placeholder="Search projects, clients, or keywords..." oninput="debounceLoadProjects()">
         </div>
+        <div style="flex:1; min-width:165px;">
+            <select id="projFilterCurrent" class="form-select" onchange="loadCurrentProjects()">
+                <option value="1" selected>Current Projects Only</option>
+                <option value="">All Projects (Current &amp; Archived)</option>
+                <option value="0">Archived / Completed Only</option>
+            </select>
+        </div>
+        <div style="flex:1; min-width:155px;">
+            <select id="projFilterClient" class="form-select" onchange="loadCurrentProjects()">
+                <option value="0">All Clients</option>
+                <?php foreach ($clients as $c): ?>
+                    <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['company_name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="flex:1; min-width:155px;">
+            <select id="projFilterDept" class="form-select" onchange="loadCurrentProjects()">
+                <option value="">All Departments</option>
+                <?php foreach ($departments as $dept): ?>
+                    <option value="<?= htmlspecialchars($dept['name']) ?>"><?= htmlspecialchars($dept['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <button class="proj-act-btn proj-act-neutral" style="height:40px; padding:0 14px;" onclick="loadCurrentProjects()">
+            <i data-feather="refresh-cw" style="width:14px; height:14px;"></i>
+            <span>Refresh</span>
+        </button>
+        <?php if ($isLead): ?>
+        <button type="button" class="proj-act-btn proj-act-primary" style="height:40px; padding:0 16px;" onclick="openImportProjectsModal()">
+            <i data-feather="download" style="width:14px; height:14px;"></i>
+            <span>Import Projects CSV</span>
+        </button>
+        <?php endif; ?>
     </div>
 
     <div id="currentProjectsGrid" class="projects-portfolio-grid">
-        <div class="card" style="grid-column:1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
+        <div class="card" style="text-align:center; padding:44px; color:var(--text-muted); border-radius:20px;">
             Loading current projects portfolio...
         </div>
     </div>
@@ -959,6 +1105,16 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
         loadMetrics();
         loadTasks();
         loadCurrentProjects();
+
+        // Support 1-click Quick Action shortcuts from Super Admin Dashboard
+        const openParam = new URLSearchParams(window.location.search).get('open');
+        if (openParam === 'new_project' && typeof openCreateProjectModal === 'function') {
+            setTimeout(() => openCreateProjectModal(), 150);
+        } else if (openParam === 'import_projects' && typeof openImportProjectsModal === 'function') {
+            setTimeout(() => openImportProjectsModal(), 150);
+        } else if (openParam === 'new_task' && typeof openCreateTaskModal === 'function') {
+            setTimeout(() => openCreateTaskModal(), 150);
+        }
     });
 
     function switchWorkspaceView(view, shouldRefresh = true) {
@@ -1032,13 +1188,13 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
 
         if (!projects.length) {
             grid.innerHTML = `
-                <div class="card" style="grid-column:1 / -1; text-align:center; padding:44px 20px;">
-                    <div style="font-size:36px; margin-bottom:10px;">📁</div>
-                    <h4 style="margin:0 0 6px 0; color:#0f172a;">No projects match the current filter</h4>
-                    <p style="font-size:13px; color:#64748b; margin:0 0 16px 0;">Add or import current projects with overview details, competitors, and deliverables.</p>
+                <div class="proj-portfolio-card" style="text-align:center; padding:52px 24px;">
+                    <div style="font-size:40px; margin-bottom:10px;">📁</div>
+                    <h4 style="margin:0 0 6px 0; color:#0f172a; font-size:17px; font-weight:800;">No projects match the current filter</h4>
+                    <p style="font-size:13.5px; color:#64748b; margin:0 0 18px 0;">Add or import current projects with overview details, competitors, and deliverables.</p>
                     <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                        ${isLeadOrAdminUser ? `<button type="button" class="btn btn-primary" onclick="openCreateProjectModal()">+ Add Current Project</button>` : ''}
-                        ${isLeadOrAdminUser ? `<button type="button" class="btn btn-outline" onclick="openImportProjectsModal()">📥 Import Projects CSV</button>` : ''}
+                        ${isLeadOrAdminUser ? `<button type="button" class="proj-act-btn proj-act-primary" onclick="openCreateProjectModal()">+ Add Current Project</button>` : ''}
+                        ${isLeadOrAdminUser ? `<button type="button" class="proj-act-btn proj-act-neutral" onclick="openImportProjectsModal()">📥 Import Projects CSV</button>` : ''}
                     </div>
                 </div>
             `;
@@ -1058,113 +1214,153 @@ $selectedProjectId = intval($_GET['project_id'] ?? 0);
             const done = parseInt(p.completed_tasks || 0);
             const inProg = parseInt(p.in_progress_tasks || 0);
             const pending = parseInt(p.pending_tasks || 0);
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const pct = total > 0 ? Math.round((done / total) * 100) : ((p.status === 'Completed') ? 100 : 0);
             const compCnt = parseInt(p.competitors_count || 0);
             const isCurr = parseInt(p.is_current ?? 1) === 1;
             const pr = prioColors[p.priority] || prioColors['Medium'];
-            const aboutPreview = (p.about_project || p.description || '').trim();
-            const safeSnippet = aboutPreview ? escapeHtml(aboutPreview.length > 135 ? aboutPreview.substring(0, 135) + '...' : aboutPreview) : '<span style="color:#94a3b8; font-style:italic;">No project summary added yet.</span>';
 
             html += `
                 <div class="proj-portfolio-card">
-                    <div>
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-                            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                                <span class="badge" style="background:${isCurr ? '#dcfce7' : '#f1f5f9'}; color:${isCurr ? '#166534' : '#475569'}; font-size:10.5px; font-weight:800;">
-                                    ${isCurr ? '● CURRENT' : 'ARCHIVED'}
+                    <div class="proj-card-body-split">
+                        <!-- LEFT: Badges, Title, Team & Metadata -->
+                        <div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+                                <span class="badge" style="background:${isCurr ? '#dcfce7' : '#f1f5f9'}; color:${isCurr ? '#15803d' : '#475569'}; font-size:11px; font-weight:800; padding:4px 11px; border-radius:999px;">
+                                    ${isCurr ? '● CURRENT' : '📁 ARCHIVED'}
                                 </span>
-                                ${p.department ? `<span class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:10.5px;">📁 ${escapeHtml(p.department)}</span>` : ''}
-                                <span class="badge" style="background:${pr.bg}; color:${pr.fg}; font-size:10.5px;">${escapeHtml(p.priority || 'High')}</span>
+                                ${p.department ? `<span class="badge" style="background:#e0e7ff; color:#3730a3; font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px;">${escapeHtml(p.department)}</span>` : ''}
+                                <span class="badge" style="background:${pr.bg}; color:${pr.fg}; font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px;">${escapeHtml(p.priority || 'High')}</span>
+                                <span class="badge" style="background:#f3e8ff; color:#7e22ce; font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px;">
+                                    🏆 ${compCnt} Competitor${compCnt === 1 ? '' : 's'}
+                                </span>
+                                ${parseInt(p.client_approved || 0) === 1 ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:700; padding:4px 11px; border-radius:999px;">✓ Client Approved</span>` : ''}
                             </div>
-                            <span class="badge" style="background:#fdf4ff; color:#7e22ce; border:1px solid #e9d5ff; font-size:10.5px; font-weight:700;">
-                                🥊 ${compCnt} Competitor${compCnt === 1 ? '' : 's'}
-                            </span>
+
+                            <a href="project_details.php?id=${p.id}" style="display:block; font-size:20px; font-weight:800; color:#0f172a; text-decoration:none; margin-bottom:8px; line-height:1.3; letter-spacing:-0.3px;">
+                                ${escapeHtml(p.project_name)}
+                            </a>
+
+                            <div style="font-size:13px; color:#475569; margin-bottom:10px; display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+                                <span style="display:inline-flex; align-items:center; gap:5px;">
+                                    <i data-feather="briefcase" style="width:14px; height:14px; color:#64748b;"></i>
+                                    <strong style="color:#1e293b;">${escapeHtml(p.company_name || 'N/A')}</strong>
+                                </span>
+                                <span style="display:inline-flex; align-items:center; gap:5px;">
+                                    <i data-feather="user" style="width:14px; height:14px; color:#6366f1;"></i>
+                                    Lead: <strong style="color:#1e293b;">${escapeHtml(p.team_lead_name || 'Unassigned')}</strong>
+                                </span>
+                            </div>
+
+                            ${(p.handlers && p.handlers.length) ? `
+                                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; align-items:center;">
+                                    <span style="font-size:12px; color:#475569; font-weight:600; display:inline-flex; align-items:center; gap:4px;">🛡️ Handlers:</span>
+                                    ${p.handlers.map(h => `<span class="badge" style="background:#eef2ff; color:#4338ca; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:999px;">${escapeHtml(h.full_name)}</span>`).join('')}
+                                </div>
+                            ` : ''}
+
+                            ${(p.working_employees && p.working_employees.length) ? `
+                                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; align-items:center;">
+                                    <span style="font-size:12px; color:#1d4ed8; font-weight:600;">👥 Working (${p.working_employees.length}):</span>
+                                    ${p.working_employees.slice(0, 5).map(w => `<span class="badge" style="background:#dbeafe; color:#1e40af; font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px;">${escapeHtml(w.full_name)}</span>`).join('')}
+                                    ${p.working_employees.length > 5 ? `<span class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:11px; padding:3px 9px; border-radius:999px;">+${p.working_employees.length - 5} more</span>` : ''}
+                                </div>
+                            ` : ''}
+
+                            ${(p.observers && p.observers.length) ? `
+                                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center;">
+                                    <span style="font-size:12px; color:#475569; font-weight:600;">👁️ Observers (${p.observers.length}):</span>
+                                    ${p.observers.slice(0, 4).map(o => `<span class="badge" style="background:#f5f3ff; color:#6d28d9; border:1px solid #ede9fe; font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px;">${escapeHtml(o.full_name)}${o.role_name ? ' (' + escapeHtml(o.role_name) + ')' : ''}</span>`).join('')}
+                                    ${p.observers.length > 4 ? `<span class="badge" style="background:#f3e8ff; color:#6b21a8; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px;">+${p.observers.length - 4} more</span>` : ''}
+                                </div>
+                            ` : ''}
+
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:12.5px; color:#334155;">
+                                <span style="background:#f8fafc; border:1px solid #e2e8f0; padding:6px 12px; border-radius:10px; display:inline-flex; align-items:center; gap:6px;">
+                                    <i data-feather="calendar" style="width:13px; height:13px; color:#64748b;"></i>
+                                    Due: <strong>${escapeHtml(p.deadline || 'N/A')}</strong>
+                                </span>
+                                <span style="background:#f5f3ff; border:1px solid #ede9fe; padding:6px 12px; border-radius:10px; display:inline-flex; align-items:center; gap:6px; color:#4c1d95;">
+                                    <i data-feather="loader" style="width:13px; height:13px; color:#7c3aed;"></i>
+                                    Status: <strong>${escapeHtml(p.status || 'In Progress')}</strong>
+                                </span>
+                            </div>
                         </div>
 
-                        <a href="project_details.php?id=${p.id}" style="display:block; font-size:17px; font-weight:800; color:#0f172a; text-decoration:none; margin-bottom:4px; line-height:1.3;">
-                            ${escapeHtml(p.project_name)}
-                        </a>
-
-                        <div style="font-size:12.5px; color:#475569; margin-bottom:8px; display:flex; flex-wrap:wrap; gap:10px;">
-                            <span>🏢 <strong>${escapeHtml(p.company_name || 'N/A')}</strong></span>
-                            <span>👤 Lead: <strong>${escapeHtml(p.team_lead_name || 'Unassigned')}</strong></span>
-                            ${parseInt(p.client_approved || 0) === 1 ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10.5px;">☑ Client Approved</span>` : ''}
-                        </div>
-
-                        ${(p.handlers && p.handlers.length) ? `
-                            <div style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:8px; align-items:center;">
-                                <span style="font-size:11px; color:#64748b; font-weight:700;">🛡️ Handlers:</span>
-                                ${p.handlers.map(h => `<span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10.5px;">${escapeHtml(h.full_name)}</span>`).join('')}
+                        <!-- RIGHT: Project Progress Bar & 3 Mini Stat Boxes -->
+                        <div class="proj-card-right">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                                <span style="font-size:14.5px; font-weight:800; color:#0f172a;">Project Progress</span>
+                                <span style="font-size:12.5px; font-weight:600; color:#64748b;">${done} of ${total} Tasks</span>
                             </div>
-                        ` : ''}
-                        ${(p.working_employees && p.working_employees.length) ? `
-                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; align-items:center;">
-                                <span style="font-size:11px; color:#1d4ed8; font-weight:700;">👥 Working (${p.working_employees.length}):</span>
-                                ${p.working_employees.slice(0, 5).map(w => `<span class="badge" style="background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; font-size:10px;">${escapeHtml(w.full_name)}</span>`).join('')}
-                                ${p.working_employees.length > 5 ? `<span class="badge" style="background:#eff6ff; color:#1d4ed8; font-size:10px;">+${p.working_employees.length - 5} more</span>` : ''}
-                            </div>
-                        ` : ''}
-                        ${(p.observers && p.observers.length) ? `
-                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; align-items:center;">
-                                <span style="font-size:10.5px; color:#6b21a8; font-weight:700;">👁️ Observers (${p.observers.length}):</span>
-                                ${p.observers.slice(0, 4).map(o => `<span class="badge" style="background:#faf5ff; color:#6b21a8; border:1px solid #e9d5ff; font-size:10px;">${escapeHtml(o.full_name)} (${escapeHtml(o.role_name || '')})</span>`).join('')}
-                                ${p.observers.length > 4 ? `<span class="badge" style="background:#f3e8ff; color:#6b21a8; font-size:10px;">+${p.observers.length - 4} more</span>` : ''}
-                            </div>
-                        ` : ''}
 
-                        <p style="font-size:12.5px; color:#334155; line-height:1.5; margin:0 0 12px 0;">
-                            ${safeSnippet}
-                        </p>
-
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; font-size:11.5px; color:#475569;">
-                            <span style="background:#f8fafc; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px;">
-                                📅 Due: <strong>${escapeHtml(p.deadline || 'N/A')}</strong>
-                            </span>
-                            <span style="background:#f8fafc; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px;">
-                                ⚙️ Status: <strong>${escapeHtml(p.status || 'In Progress')}</strong>
-                            </span>
-                            ${p.target_audience ? `<span style="background:#f8fafc; border:1px solid #e2e8f0; padding:3px 8px; border-radius:6px;">🎯 ${escapeHtml(p.target_audience.length > 26 ? p.target_audience.substring(0, 26) + '…' : p.target_audience)}</span>` : ''}
-                        </div>
-
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px;">
-                            <div style="display:flex; justify-content:space-between; font-size:11.5px; font-weight:700; color:#334155; margin-bottom:6px;">
-                                <span>Deliverable Progress (${done}/${total} tasks)</span>
-                                <span style="color:#2563eb;">${pct}%</span>
+                            <div style="display:flex; align-items:center; gap:14px;">
+                                <div style="flex:1; height:10px; background:#ede9fe; border-radius:999px; overflow:hidden;">
+                                    <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, #5b46f6, #7c3aed); border-radius:999px; transition:width 0.35s ease;"></div>
+                                </div>
+                                <span style="font-size:16px; font-weight:800; color:#5b46f6; min-width:42px; text-align:right;">${pct}%</span>
                             </div>
-                            <div style="height:7px; background:#e2e8f0; border-radius:999px; overflow:hidden; margin-bottom:6px;">
-                                <div style="height:100%; width:${pct}%; background:linear-gradient(90deg, #2563eb, #10b981); border-radius:999px;"></div>
-                            </div>
-                            <div style="display:flex; gap:12px; font-size:11px; color:#64748b;">
-                                <span>⏳ Pending: <strong>${pending}</strong></span>
-                                <span>⚡ Active: <strong>${inProg}</strong></span>
-                                <span>✅ Done: <strong>${done}</strong></span>
+
+                            <div class="proj-mini-stats">
+                                <div class="proj-mini-stat-box">
+                                    <div style="width:28px; height:28px; border-radius:8px; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px;">⏳</div>
+                                    <div>
+                                        <div style="font-size:17px; font-weight:800; color:#0f172a; line-height:1.1;">${pending}</div>
+                                        <div style="font-size:11.5px; color:#64748b; font-weight:600; margin-top:2px;">Pending</div>
+                                    </div>
+                                </div>
+                                <div class="proj-mini-stat-box">
+                                    <div style="width:28px; height:28px; border-radius:8px; background:#ecfdf5; color:#10b981; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:12px;">▶</div>
+                                    <div>
+                                        <div style="font-size:17px; font-weight:800; color:#0f172a; line-height:1.1;">${inProg}</div>
+                                        <div style="font-size:11.5px; color:#64748b; font-weight:600; margin-top:2px;">Active</div>
+                                    </div>
+                                </div>
+                                <div class="proj-mini-stat-box stat-done">
+                                    <div style="width:28px; height:28px; border-radius:50%; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:800; font-size:13px;">✓</div>
+                                    <div>
+                                        <div style="font-size:17px; font-weight:800; color:#0f172a; line-height:1.1;">${done}</div>
+                                        <div style="font-size:11.5px; color:#15803d; font-weight:600; margin-top:2px;">Done</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; padding-top:10px; border-top:1px solid #f1f5f9;">
-                        <a href="project_details.php?id=${p.id}" class="btn btn-primary btn-sm" style="flex:1; text-align:center; justify-content:center;">
-                            📊 Overview & Competitors
-                        </a>
-                        ${(p.can_manage_project || isLeadOrAdminUser) ? `
-                            <button type="button" class="btn btn-outline btn-sm" style="color:#15803d; border-color:#86efac; background:#f0fdf4; font-weight:700;" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")})'>
-                                + Task
+                    <!-- FOOTER ACTION ROW -->
+                    <div class="proj-card-footer">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                            <a href="project_details.php?id=${p.id}" class="proj-act-btn proj-act-primary">
+                                <i data-feather="grid" style="width:14px; height:14px;"></i>
+                                <span>Overview &amp; Competitors</span>
+                            </a>
+                            ${(p.can_manage_project || isLeadOrAdminUser) ? `
+                                <button type="button" class="proj-act-btn proj-act-mint" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")})'>
+                                    <span>+ Task</span>
+                                </button>
+                                <button type="button" class="proj-act-btn proj-act-violet" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")}, 0, true)'>
+                                    <span>+ Sub-Task</span>
+                                </button>
+                            ` : ''}
+                            ${isLeadOrAdminUser ? `
+                                <button type="button" class="proj-act-btn proj-act-sky" onclick='openAssignProjectHandlersModal(${p.id}, ${JSON.stringify(p.project_name || "")}, ${JSON.stringify(p.handler_ids || [])})' title="Select & Assign Project Handlers separately (Lead Only)">
+                                    <i data-feather="users" style="width:14px; height:14px;"></i>
+                                    <span>Handlers</span>
+                                </button>
+                            ` : ''}
+                        </div>
+
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            ${isLeadOrAdminUser ? `
+                                <button type="button" class="proj-act-btn proj-act-neutral" onclick="openEditProjectModal(${p.id})" title="Edit Project Overview & Details">
+                                    <i data-feather="edit-2" style="width:13px; height:13px; color:#d97706;"></i>
+                                    <span>Edit</span>
+                                </button>
+                            ` : ''}
+                            <button type="button" class="proj-act-btn proj-act-neutral" onclick="viewProjectTasks(${p.id})" title="Filter Tasks Table by this Project">
+                                <i data-feather="clipboard" style="width:13px; height:13px; color:#64748b;"></i>
+                                <span>Tasks</span>
                             </button>
-                            <button type="button" class="btn btn-outline btn-sm" style="color:#7c3aed; border-color:#ddd6fe; background:#f5f3ff; font-weight:700;" onclick='openCreateProjectTask(${p.id}, ${JSON.stringify(p.department || "")}, 0, true)'>
-                                + Sub-Task
-                            </button>
-                        ` : ''}
-                        ${isLeadOrAdminUser ? `
-                            <button type="button" class="btn btn-outline btn-sm" style="color:#0f766e; border-color:#99f6e4; background:#f0fdfa; font-weight:700;" onclick='openAssignProjectHandlersModal(${p.id}, ${JSON.stringify(p.project_name || "")}, ${JSON.stringify(p.handler_ids || [])})' title="Select & Assign Project Handlers separately (Lead Only)">
-                                🛡️ Handlers
-                            </button>
-                            <button type="button" class="btn btn-outline btn-sm" onclick="openEditProjectModal(${p.id})" title="Edit Project Overview & Details">
-                                ✏️ Edit
-                            </button>
-                        ` : ''}
-                        <button type="button" class="btn btn-outline btn-sm" onclick="viewProjectTasks(${p.id})" title="Filter Tasks Table by this Project">
-                            📋 Tasks
-                        </button>
+                        </div>
                     </div>
                 </div>
             `;
