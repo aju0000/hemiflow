@@ -1,5 +1,5 @@
 <?php
-// template_generator.php - Module 3 Template Generator & Document Customizer Suite
+// template_generator.php - Module 3 Proposal & Document Customizer Suite
 
 require_once __DIR__ . '/auth.php';
 checkAuth('template-generator');
@@ -8,8 +8,8 @@ $user = getCurrentUser();
 $db = getDbConnection();
 
 $pageBreadcrumb = "Module 3";
-$pageTitle = "Premium Template Generator & Customizer Suite";
-$pageSubtitle = "Create new documents, edit existing saved documents, build custom templates, and manage multi-page proposals.";
+$pageTitle = "Proposal & Document Suite";
+$pageSubtitle = "Create proposals, edit existing saved proposals, build custom templates, and manage multi-page documents.";
 require_once __DIR__ . '/header.php';
 
 // Fetch active clients
@@ -25,39 +25,573 @@ foreach ($templates as $t) {
 }
 ?>
 
-<!-- Action Pills Navigation Bar -->
-<div class="action-pills-row">
-    <button class="btn-pill-primary" onclick="openQuickClientModal()">
-        <i data-feather="user-plus" class="icon-prefix"></i>
-        <span>+ Add Client</span>
-        <i data-feather="arrow-right" style="width:16px; height:16px; margin-left:4px;"></i>
-    </button>
-    <button class="btn-pill-white" onclick="openNewDocumentModal()">
-        <i data-feather="plus" class="icon-tag"></i>
-        <span>+ Add New Document</span>
-    </button>
-    <button class="btn-pill-white" onclick="openSavedDocumentsModal()">
-        <i data-feather="folder" class="icon-folder"></i>
-        <span>Saved Documents & Edit</span>
-    </button>
-    <button class="btn-pill-white" onclick="openTemplateEditorModal()">
-        <i data-feather="edit-3" class="icon-edit"></i>
-        <span>Edit / Add Template</span>
-    </button>
-    <button class="btn-pill-white" onclick="openDocumentTypesModal()">
-        <i data-feather="tag" class="icon-tag"></i>
-        <span>Document Types</span>
-    </button>
-    <button class="btn-pill-white" onclick="openVersionHistoryModal()">
-        <i data-feather="clock" class="icon-clock"></i>
-        <span>Version History</span>
-    </button>
+<style>
+/* ========================================================= */
+/* MODULE 3: ULTRA-PREMIUM PROPOSAL & SUITE THEME             */
+/* ========================================================= */
+
+/* Glowing Deep Violet Hero Header */
+.top-header {
+    background: linear-gradient(135deg, #0a031f 0%, #170938 50%, #220c54 100%) !important;
+    border-bottom: none !important;
+    padding: 24px 32px 14px 32px !important;
+    position: relative !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+}
+
+/* Radiant Ambient Glow Behind Header */
+.top-header::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: 18%;
+    width: 420px;
+    height: 180px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(99, 102, 241, 0) 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+.top-header::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: 20%;
+    width: 340px;
+    height: 140px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, rgba(147, 51, 234, 0) 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.top-header .page-header-info {
+    position: relative;
+    z-index: 1;
+}
+
+.top-header .module-badge-tag {
+    color: #c084fc !important;
+    background: rgba(168, 85, 247, 0.18) !important;
+    border: 1px solid rgba(192, 132, 252, 0.3) !important;
+    border-radius: 6px !important;
+    padding: 3px 10px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 6px !important;
+    display: inline-block !important;
+}
+
+.top-header .page-title {
+    color: #ffffff !important;
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.025em !important;
+    line-height: 1.25 !important;
+    margin-bottom: 4px !important;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.35) !important;
+}
+
+.top-header .page-subtitle {
+    color: #cbd5e1 !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    line-height: 1.5 !important;
+    opacity: 0.95 !important;
+}
+
+.top-header .header-tools-area {
+    position: relative;
+    z-index: 1;
+}
+
+.top-header .header-search-wrapper {
+    width: 290px !important;
+}
+
+.top-header .header-search-input {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 9999px !important;
+    padding: 9px 18px 9px 38px !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15) !important;
+}
+
+.top-header .header-search-input::placeholder {
+    color: #94a3b8 !important;
+}
+
+.top-header .header-search-icon {
+    color: #64748b !important;
+}
+
+.top-header .team-presence-pill,
+.top-header .my-presence-btn,
+.top-header .user-profile-pill,
+.top-header .icon-circle-btn {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: #ffffff !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+.top-header .team-presence-pill:hover,
+.top-header .my-presence-btn:hover,
+.top-header .user-profile-pill:hover,
+.top-header .icon-circle-btn:hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.top-header .user-pill-name {
+    color: #ffffff !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+
+.top-header .user-pill-role {
+    color: #cbd5e1 !important;
+    font-size: 11px !important;
+}
+
+.top-header .user-avatar-circle {
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+}
+
+.top-header .icon-circle-btn i {
+    color: #ffffff !important;
+}
+
+/* Seamless Hero Action Bar */
+.tg-hero-banner {
+    background: linear-gradient(180deg, #160936 0%, #0b031c 100%);
+    margin: -10px -32px 28px -32px;
+    padding: 8px 32px 26px 32px;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.22);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 14px 28px -8px rgba(10, 3, 28, 0.65);
+}
+
+.tg-hero-banner::before {
+    content: '';
+    position: absolute;
+    bottom: -60px;
+    right: 12%;
+    width: 440px;
+    height: 150px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(99, 102, 241, 0) 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.tg-hero-banner .action-pills-row {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 0;
+    gap: 12px;
+}
+
+/* Primary + New Client Button */
+.tg-btn-primary-client {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 9999px !important;
+    padding: 11px 22px !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-shadow: 0 8px 20px -3px rgba(79, 70, 229, 0.55), 0 0 16px rgba(99, 102, 241, 0.3) !important;
+    cursor: pointer !important;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.tg-btn-primary-client:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 12px 25px -4px rgba(79, 70, 229, 0.7), 0 0 22px rgba(99, 102, 241, 0.45) !important;
+    color: #ffffff !important;
+}
+
+.btn-pill-white {
+    background: #ffffff !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    border-radius: 9999px !important;
+    padding: 10px 20px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-pill-white:hover {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12) !important;
+    color: #0f172a !important;
+}
+
+/* Page Background & Grid */
+body {
+    background-color: #f8faff !important;
+}
+
+.main-wrapper {
+    background-color: #f8faff !important;
+    position: relative;
+    min-height: 100vh;
+}
+
+.tg-ambient-waves {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 320px;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.85;
+}
+
+.grid-2 {
+    position: relative;
+    z-index: 1;
+}
+
+/* Left Column: Document Configuration Card */
+.tg-config-card {
+    background: #ffffff !important;
+    border-radius: 24px !important;
+    border: 1px solid rgba(226, 232, 240, 0.85) !important;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.02) !important;
+    padding: 24px !important;
+}
+
+.tg-config-card .card-icon-box {
+    background: #f5f3ff !important;
+    color: #7c3aed !important;
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.12) !important;
+}
+
+.tg-config-card .card-title-text h3 {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: -0.3px !important;
+    margin-bottom: 2px !important;
+}
+
+.tg-config-card .card-title-text p {
+    font-size: 12px !important;
+    color: #64748b !important;
+}
+
+/* Mode Selector Box */
+.mode-load-card {
+    background: #f0f7ff !important;
+    border: 1px solid #dbeafe !important;
+    border-radius: 16px !important;
+    padding: 13px 15px !important;
+    margin-bottom: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.04) !important;
+}
+
+.mode-icon-box {
+    background: #ffffff !important;
+    border-radius: 10px !important;
+    width: 38px !important;
+    height: 38px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #2563eb !important;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.12) !important;
+    flex-shrink: 0 !important;
+}
+
+.mode-label {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    margin-bottom: 4px !important;
+    display: block !important;
+}
+
+/* Numbered Steps Badges (1, 2, 3, 4) */
+.step-num-badge {
+    background: #1e3a8a !important;
+    color: #ffffff !important;
+    width: 22px !important;
+    height: 22px !important;
+    border-radius: 50% !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 2px 5px rgba(30, 58, 138, 0.3) !important;
+}
+
+.step-label-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+
+.step-icon-indicator {
+    width: 14px !important;
+    height: 14px !important;
+    color: #2563eb !important;
+}
+
+.form-select, .form-control {
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    background-color: #ffffff !important;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+    transition: all 0.2s ease !important;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12) !important;
+    outline: none !important;
+}
+
+/* Right Column: Preview Card */
+.preview-card-wrap {
+    background: #ffffff !important;
+    border-radius: 24px !important;
+    border: 1px solid rgba(226, 232, 240, 0.85) !important;
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05), 0 4px 6px -2px rgba(15, 23, 42, 0.02) !important;
+    padding: 24px !important;
+    min-height: 640px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.preview-header-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding-bottom: 18px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    gap: 16px !important;
+    flex-wrap: wrap !important;
+}
+
+.preview-badge-draft {
+    background: #f3e8ff !important;
+    color: #7e22ce !important;
+    font-weight: 700 !important;
+    font-size: 11.5px !important;
+    padding: 4px 12px !important;
+    border-radius: 9999px !important;
+    border: 1px solid #e9d5ff !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+}
+
+.preview-doc-heading {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin-left: 6px !important;
+}
+
+.preview-doc-sub {
+    font-size: 12.5px !important;
+    color: #64748b !important;
+    font-weight: 400 !important;
+    margin-left: 6px !important;
+}
+
+.preview-actions-right .btn-outline {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 9999px !important;
+    color: #334155 !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    padding: 7px 16px !important;
+    transition: all 0.18s ease !important;
+}
+
+.preview-actions-right .btn-outline:hover {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    transform: translateY(-1px) !important;
+}
+
+.preview-empty-stage {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 40px 20px 24px 20px !important;
+    text-align: center !important;
+}
+
+.empty-state-title {
+    font-size: 21px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin-top: 20px !important;
+    letter-spacing: -0.3px !important;
+}
+
+.empty-state-desc {
+    font-size: 13.5px !important;
+    color: #64748b !important;
+    max-width: 540px !important;
+    line-height: 1.55 !important;
+    margin: 8px auto 36px auto !important;
+}
+
+/* 4 Feature Highlights Grid */
+.tg-features-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    max-width: 780px;
+    margin: 0 auto;
+    padding-top: 28px;
+    border-top: 1px solid #f1f5f9;
+    gap: 12px;
+}
+
+.tg-feature-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+}
+
+.tg-feature-icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #f3e8ff;
+    color: #7c3aed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.1);
+}
+
+.tg-feature-icon-circle svg, .tg-feature-icon-circle i {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.2;
+}
+
+.tg-feature-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 2px;
+}
+
+.tg-feature-desc {
+    font-size: 11.5px;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.tg-feature-divider {
+    width: 1px;
+    height: 44px;
+    background: #f1f5f9;
+    flex-shrink: 0;
+}
+
+@media (max-width: 992px) {
+    .grid-2 {
+        grid-template-columns: 1fr !important;
+    }
+    .tg-hero-banner {
+        margin: -10px -20px 24px -20px;
+        padding: 6px 20px 22px 20px;
+    }
+    .tg-features-footer {
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .tg-feature-divider {
+        display: none;
+    }
+    .tg-feature-item {
+        min-width: 140px;
+    }
+}
+</style>
+
+<!-- Hero Action Bar with Ambient Indigo Backdrop -->
+<div class="tg-hero-banner">
+    <div class="action-pills-row">
+        <button class="btn-pill-primary tg-btn-primary-client" onclick="openQuickClientModal()">
+            <i data-feather="plus" class="icon-prefix"></i>
+            <span>+ New Client</span>
+            <i data-feather="chevron-down" style="width:14px; height:14px; margin-left:4px;"></i>
+        </button>
+        <button class="btn-pill-white" onclick="openNewDocumentModal()">
+            <i data-feather="plus" class="icon-tag"></i>
+            <span>+ Add Proposal</span>
+        </button>
+        <button class="btn-pill-white" onclick="openSavedDocumentsModal()">
+            <i data-feather="folder" class="icon-folder"></i>
+            <span>Saved Documents & Edit</span>
+        </button>
+        <button class="btn-pill-white" onclick="openTemplateEditorModal()">
+            <i data-feather="edit-3" class="icon-edit"></i>
+            <span>Edit / Add Template</span>
+        </button>
+        <button class="btn-pill-white" onclick="openDocumentTypesModal()">
+            <i data-feather="tag" class="icon-tag"></i>
+            <span>Document Types</span>
+        </button>
+        <button class="btn-pill-white" onclick="openVersionHistoryModal()">
+            <i data-feather="clock" class="icon-clock"></i>
+            <span>Version History</span>
+        </button>
+    </div>
 </div>
 
 <div class="grid-2" style="grid-template-columns: 390px 1fr; align-items: start; gap: 24px;">
 
     <!-- Left Column: Generator Configuration & Custom Fields -->
-    <div class="card" style="padding: 24px;">
+    <div class="card tg-config-card" style="padding: 24px;">
         <div class="card-header-clean">
             <div class="card-title-group">
                 <div class="card-icon-box">
@@ -82,7 +616,7 @@ foreach ($templates as $t) {
                 <div class="mode-content">
                     <label class="mode-label">Mode / Load Saved Document</label>
                     <select id="savedDocQuickSelect" class="form-select" onchange="onQuickSavedDocSelected()" style="background-color:#ffffff; font-size:13px; font-weight:600;">
-                        <option value="0">Create New Document from Template</option>
+                        <option value="0">Create New Proposal from Template</option>
                         <!-- Populated dynamically -->
                     </select>
                 </div>
@@ -110,15 +644,15 @@ foreach ($templates as $t) {
                 </select>
             </div>
 
-            <!-- Step 2: Select Client Service Package -->
+            <!-- Step 2: Select Client Service Package (Optional) -->
             <div class="form-step-group">
                 <div class="step-label-row">
                     <div class="step-num-badge">2</div>
                     <i data-feather="package" class="step-icon-indicator"></i>
-                    <span class="step-label-title">Select Service Package *</span>
+                    <span class="step-label-title">Select Service Package (Optional)</span>
                 </div>
-                <select id="serviceSelect" class="form-select" onchange="onServiceChanged()" required>
-                    <option value="">-- Select Client First --</option>
+                <select id="serviceSelect" class="form-select" onchange="onServiceChanged()">
+                    <option value="">-- No Package / Optional --</option>
                 </select>
             </div>
 
@@ -298,6 +832,41 @@ foreach ($templates as $t) {
                     </div>
                     <h3 class="empty-state-title">Dynamic Premium Document Live Preview</h3>
                     <p class="empty-state-desc">Select a Client and Document Type on the left panel or load an existing saved document to render live preview.</p>
+                    
+                    <!-- 4-Feature Highlights Footer matching UI Reference -->
+                    <div class="tg-features-footer">
+                        <div class="tg-feature-item">
+                            <div class="tg-feature-icon-circle">
+                                <i data-feather="eye"></i>
+                            </div>
+                            <div class="tg-feature-title">Live Preview</div>
+                            <div class="tg-feature-desc">See changes instantly</div>
+                        </div>
+                        <div class="tg-feature-divider"></div>
+                        <div class="tg-feature-item">
+                            <div class="tg-feature-icon-circle">
+                                <i data-feather="edit-2"></i>
+                            </div>
+                            <div class="tg-feature-title">Edit & Customize</div>
+                            <div class="tg-feature-desc">Update content with ease</div>
+                        </div>
+                        <div class="tg-feature-divider"></div>
+                        <div class="tg-feature-item">
+                            <div class="tg-feature-icon-circle">
+                                <i data-feather="download"></i>
+                            </div>
+                            <div class="tg-feature-title">Export Ready</div>
+                            <div class="tg-feature-desc">PDF & Word (.doc)</div>
+                        </div>
+                        <div class="tg-feature-divider"></div>
+                        <div class="tg-feature-item">
+                            <div class="tg-feature-icon-circle">
+                                <i data-feather="layers"></i>
+                            </div>
+                            <div class="tg-feature-title">Template-based</div>
+                            <div class="tg-feature-desc">Use and manage templates</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -305,12 +874,12 @@ foreach ($templates as $t) {
 </div>
 
 <!-- ========================================== -->
-<!-- MODAL: ADD NEW DOCUMENT (DIRECT CREATION) -->
+<!-- MODAL: ADD PROPOSAL (DIRECT CREATION) -->
 <!-- ========================================== -->
 <div id="newDocumentModal" class="modal-overlay" style="display:none;">
     <div class="modal-content" style="max-width:850px;">
         <div class="modal-header">
-            <h3 class="modal-title">Add New Document</h3>
+            <h3 class="modal-title">Add Proposal</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('newDocumentModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); submitNewCustomDocument();">
@@ -388,7 +957,7 @@ foreach ($templates as $t) {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('newDocumentModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create & Save Document</button>
+                <button type="submit" class="btn btn-primary">Create & Save Proposal</button>
             </div>
         </form>
     </div>
@@ -407,7 +976,7 @@ foreach ($templates as $t) {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
                 <input type="text" id="sd_search" class="form-control" style="max-width:300px;" placeholder="Search by title, client, doc number..." onkeyup="filterSavedDocsTable()">
                 <button class="btn btn-primary btn-sm" onclick="closeModal('savedDocumentsModal'); openNewDocumentModal();">
-                    <i data-feather="plus"></i> + Add New Document
+                    <i data-feather="plus"></i> + Add Proposal
                 </button>
             </div>
 
@@ -599,11 +1168,11 @@ foreach ($templates as $t) {
     </div>
 </div>
 
-<!-- MODAL: QUICK ADD CLIENT -->
+<!-- MODAL: QUICK NEW CLIENT -->
 <div id="quickClientModal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">Quick Add New Client</h3>
+            <h3 class="modal-title">Quick New Client</h3>
             <button class="btn btn-outline btn-sm" onclick="closeModal('quickClientModal')">&times;</button>
         </div>
         <form onsubmit="event.preventDefault(); saveQuickClient();">
@@ -627,17 +1196,6 @@ foreach ($templates as $t) {
                     <div class="form-group">
                         <label class="form-label">Phone</label>
                         <input type="text" id="qc_phone" class="form-control" placeholder="+91 98765 00000">
-                    </div>
-                </div>
-
-                <div class="grid-2">
-                    <div class="form-group">
-                        <label class="form-label">Service Package Name</label>
-                        <input type="text" id="qc_service_name" class="form-control" placeholder="e.g. Digital Marketing Suite">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Package Price (INR)</label>
-                        <input type="number" id="qc_price" class="form-control" placeholder="70000">
                     </div>
                 </div>
 
@@ -968,7 +1526,7 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
                 if (data.success) {
                     savedDocumentsCache = data.documents;
                     const select = document.getElementById('savedDocQuickSelect');
-                    select.innerHTML = '<option value="0">Mode: Create New Document from Template</option>';
+                    select.innerHTML = '<option value="0">Mode: Create New Proposal from Template</option>';
                     data.documents.forEach(d => {
                         const opt = document.createElement('option');
                         opt.value = d.id;
@@ -1340,7 +1898,7 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         .then(data => {
             if (data.success) {
                 closeModal('newDocumentModal');
-                alert('✅ New Document Created Successfully!');
+                alert('✅ Proposal Created Successfully!');
                 loadSavedDocsQuickDropdown();
                 loadSavedDocumentToWorkspace(data.document_id);
             } else {
@@ -2191,24 +2749,20 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         document.getElementById('qc_contact_person').value = '';
         document.getElementById('qc_email').value = '';
         document.getElementById('qc_phone').value = '';
-        document.getElementById('qc_service_name').value = '';
-        document.getElementById('qc_price').value = '';
-        document.getElementById('qc_username').value = '';
-        document.getElementById('qc_password').value = '';
+        if (document.getElementById('qc_username')) document.getElementById('qc_username').value = '';
+        if (document.getElementById('qc_password')) document.getElementById('qc_password').value = '';
         document.getElementById('quickClientModal').style.display = 'flex';
         setTimeout(() => document.getElementById('qc_company_name')?.focus(), 50);
     }
 
     function saveQuickClient() {
         const payload = {
-            company_name: document.getElementById('qc_company_name').value,
-            contact_person: document.getElementById('qc_contact_person').value,
-            email: document.getElementById('qc_email').value,
-            phone: document.getElementById('qc_phone').value,
-            service_name: document.getElementById('qc_service_name').value,
-            price: document.getElementById('qc_price').value,
-            username: document.getElementById('qc_username').value,
-            password: document.getElementById('qc_password').value
+            company_name: document.getElementById('qc_company_name').value.trim(),
+            contact_person: document.getElementById('qc_contact_person').value.trim(),
+            email: document.getElementById('qc_email').value.trim(),
+            phone: document.getElementById('qc_phone').value.trim(),
+            username: document.getElementById('qc_username') ? document.getElementById('qc_username').value.trim() : '',
+            password: document.getElementById('qc_password') ? document.getElementById('qc_password').value.trim() : ''
         };
 
         fetch('api.php?action=create_client', {
@@ -2232,6 +2786,10 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         .catch(err => {
             alert('Error: ' + err.message);
         });
+    }
+
+    function submitQuickClient() {
+        saveQuickClient();
     }
 
     function submitHandover() {
@@ -2519,5 +3077,13 @@ Invoice: `<div style="font-family: 'Google Sans', 'Google Sans Text', 'Segoe UI'
         loadDocumentTypes();
     });
 </script>
+
+<!-- Ambient Background Waves -->
+<div class="tg-ambient-waves" aria-hidden="true">
+    <svg viewBox="0 0 1440 320" preserveAspectRatio="none">
+        <path fill="rgba(168, 85, 247, 0.05)" d="M0,192L48,197.3C96,203,192,213,288,197.3C384,181,480,139,576,138.7C672,139,768,181,864,197.3C960,213,1056,203,1152,181.3C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,968,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        <path fill="rgba(99, 102, 241, 0.04)" d="M0,256L48,245.3C96,235,192,213,288,213.3C384,213,480,235,576,240C672,245,768,235,864,208C960,181,1056,139,1152,138.7C1248,139,1344,181,1392,202.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,968,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+    </svg>
+</div>
 
 <?php require_once __DIR__ . '/footer.php'; ?>

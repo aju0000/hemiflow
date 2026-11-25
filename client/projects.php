@@ -36,9 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <h3 style="margin:0; font-size:18px; font-weight:800; color:#0f172a;">${p.project_name}</h3>
                                 <span class="badge ${p.status === 'Completed' ? 'badge-success' : 'badge-primary'}" style="font-size:12px;">${p.status}</span>
                             </div>
-                            <p style="font-size:13.5px; color:#475569; line-height:1.5; margin-bottom:16px;">
+                            <p style="font-size:13.5px; color:#475569; line-height:1.5; margin-bottom:12px;">
                                 ${p.description || 'Corporate project deliverables and task timeline.'}
                             </p>
+                            ${(p.services && p.services.length) ? `
+                                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center;">
+                                    <span style="font-size:11.5px; color:#64748b; font-weight:600;">Services:</span>
+                                    ${p.services.map(s => `<span class="badge" style="background:#eff6ff; color:#1d4ed8; font-weight:700; font-size:11px; padding:3px 9px; border-radius:999px;">${s.service_name}</span>`).join('')}
+                                </div>
+                            ` : ''}
                         </div>
 
                         <div>

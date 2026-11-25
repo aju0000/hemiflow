@@ -34,86 +34,543 @@ if (empty($departments)) {
 }
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; flex-wrap:wrap; gap:12px;">
-    <div>
-        <h2 style="font-size:20px; font-weight:700;">User & Team Lead Management</h2>
-        <p style="color:var(--text-muted); font-size:14px;">
-            <?= $isSuperAdmin ? 'Super Admin Portal: Create Team Leads, Admins, Developers, manage departments, and user invitations.' : 'Team Lead Portal: Create developer/staff accounts, assign departments, and generate signup links.' ?>
-        </p>
+<style>
+/* Scoped modern styling for User Management */
+.cm-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 22px;
+}
+@media (max-width: 1100px) {
+    .cm-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .cm-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cm-kpi-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.025);
+    border: 1px solid #f1f5f9;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cm-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+.cm-kpi-card::after {
+    content: "";
+    position: absolute;
+    right: -25px;
+    bottom: -25px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.9;
+}
+.cm-card-purple::after {
+    background: radial-gradient(circle, rgba(243, 232, 255, 0.85) 0%, rgba(250, 245, 255, 0) 70%);
+}
+.cm-card-green::after {
+    background: radial-gradient(circle, rgba(236, 253, 245, 0.85) 0%, rgba(240, 253, 250, 0) 70%);
+}
+.cm-card-orange::after {
+    background: radial-gradient(circle, rgba(255, 247, 237, 0.9) 0%, rgba(255, 251, 235, 0) 70%);
+}
+.cm-card-blue::after {
+    background: radial-gradient(circle, rgba(239, 246, 255, 0.85) 0%, rgba(248, 250, 252, 0) 70%);
+}
+
+.cm-kpi-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.cm-kpi-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.cm-icon-purple {
+    background: #f5f3ff;
+    color: #7c3aed;
+}
+.cm-icon-green {
+    background: #ecfdf5;
+    color: #10b981;
+}
+.cm-icon-orange {
+    background: #fff7ed;
+    color: #f97316;
+}
+.cm-icon-blue {
+    background: #eff6ff;
+    color: #0284c7;
+}
+.cm-kpi-icon-box svg {
+    width: 18px;
+    height: 18px;
+}
+.cm-kpi-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.cm-kpi-bottom {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 14px;
+}
+.cm-kpi-number {
+    font-size: 30px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+    letter-spacing: -0.5px;
+}
+.cm-trend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Action Buttons Row */
+.cm-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.cm-bar-left, .cm-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cm-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%);
+    color: #ffffff !important;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(91, 33, 182, 0.28);
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+.cm-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(91, 33, 182, 0.38);
+    color: #ffffff !important;
+}
+.cm-btn-pill-white {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0;
+    padding: 9px 20px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+.cm-btn-pill-white:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+.cm-btn-pill-white svg, .cm-btn-primary svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Filter & Search Bar */
+.cm-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.cm-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 260px;
+}
+.cm-search-wrapper svg {
+    width: 17px;
+    height: 17px;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+.cm-search-input {
+    border: none;
+    outline: none;
+    font-size: 13.5px;
+    color: #1e293b;
+    width: 100%;
+    background: transparent;
+}
+.cm-search-input::placeholder {
+    color: #94a3b8;
+}
+.cm-filter-dropdowns {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.cm-filter-select {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.cm-filter-select:hover, .cm-filter-select:focus {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+/* Table Card */
+.cm-table-card {
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.025);
+    overflow: hidden;
+}
+.cm-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+.cm-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.cm-table th {
+    background: #ffffff;
+    color: #64748b;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 16px 20px;
+    text-align: left;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+}
+.cm-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f8fafc;
+    vertical-align: middle;
+    font-size: 13.5px;
+    color: #334155;
+}
+.cm-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+.cm-table tbody tr:hover {
+    background: #fafafa;
+}
+.cm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Avatar circle */
+.cm-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: -0.2px;
+}
+.cm-client-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 200px;
+}
+.cm-client-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cm-company-link {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+.cm-company-link:hover {
+    color: #6d28d9;
+}
+.cm-contact-sub {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* Meta info */
+.cm-meta-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12.5px;
+    min-width: 170px;
+}
+.cm-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #334155;
+    white-space: nowrap;
+}
+.cm-meta-line svg {
+    width: 13px;
+    height: 13px;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+/* Portal Account Badge */
+.cm-portal-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: #ede9fe;
+    color: #6d28d9;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Status Pill */
+.cm-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.cm-status-pill.cm-status-active {
+    background: #ecfdf5;
+    color: #059669;
+}
+.cm-status-pill.cm-status-suspended {
+    background: #fef2f2;
+    color: #dc2626;
+}
+.cm-status-dot {
+    font-size: 10px;
+    line-height: 1;
+}
+
+/* Action icons */
+.cm-action-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+.cm-action-icon-btn:hover {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+.cm-action-icon-btn svg {
+    width: 15px;
+    height: 15px;
+}
+</style>
+
+<!-- Action Pills Navigation Bar -->
+<div class="cm-action-bar">
+    <div class="cm-bar-left">
+        <button type="button" class="cm-btn-primary" onclick="openCreateUserModal()">
+            <i data-feather="user-plus"></i>
+            <span>+ Add New User Account</span>
+        </button>
+        <button type="button" class="cm-btn-pill-white" onclick="openManageDeptModal()">
+            <i data-feather="folder"></i>
+            <span>Department Roles &amp; Management</span>
+        </button>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-outline" onclick="openManageDeptModal()">
-            <i data-feather="folder"></i> Department Roles & Management
-        </button>
-        <button class="btn btn-outline" onclick="openImportUsersModal()">
-            <i data-feather="upload"></i> 📥 Import Users (CSV)
-        </button>
-        <button class="btn btn-primary" onclick="openCreateUserModal()">
-            <i data-feather="user-plus"></i> + Add New User Account
+    <div class="cm-bar-right">
+        <button type="button" class="cm-btn-pill-white" onclick="openImportUsersModal()">
+            <i data-feather="upload"></i>
+            <span>Import Users (CSV)</span>
         </button>
     </div>
 </div>
 
 <!-- Metrics Cards -->
-<div class="grid-4" style="margin-bottom: 24px;">
-    <div class="card" style="padding:18px;">
-        <span style="color:var(--text-muted); font-size:12px; font-weight:700; text-transform:uppercase;">Total System Users</span>
-        <h3 id="statTotalUsers" style="font-size:24px; font-weight:800; color:var(--primary); margin-top:4px;">0</h3>
+<div class="cm-kpi-grid">
+    <div class="cm-kpi-card cm-card-purple">
+        <div class="cm-kpi-top">
+            <div class="cm-kpi-icon-box cm-icon-purple">
+                <i data-feather="users"></i>
+            </div>
+            <span class="cm-kpi-title">Total System Users</span>
+        </div>
+        <div class="cm-kpi-bottom">
+            <span class="cm-kpi-number" id="statTotalUsers">0</span>
+            <span class="cm-trend-pill" style="background:#f3e8ff; color:#7c3aed;">All Accounts</span>
+        </div>
     </div>
-    <div class="card" style="padding:18px;">
-        <span style="color:var(--text-muted); font-size:12px; font-weight:700; text-transform:uppercase;">Super Admins</span>
-        <h3 id="statAdmins" style="font-size:24px; font-weight:800; color:#9333ea; margin-top:4px;">0</h3>
+
+    <div class="cm-kpi-card cm-card-blue">
+        <div class="cm-kpi-top">
+            <div class="cm-kpi-icon-box cm-icon-blue">
+                <i data-feather="shield"></i>
+            </div>
+            <span class="cm-kpi-title">Super Admins</span>
+        </div>
+        <div class="cm-kpi-bottom">
+            <span class="cm-kpi-number" id="statAdmins">0</span>
+            <span class="cm-trend-pill" style="background:#ede9fe; color:#6d28d9;">Privileged</span>
+        </div>
     </div>
-    <div class="card" style="padding:18px;">
-        <span style="color:var(--text-muted); font-size:12px; font-weight:700; text-transform:uppercase;">Team Leads</span>
-        <h3 id="statTeamLeads" style="font-size:24px; font-weight:800; color:#2563eb; margin-top:4px;">0</h3>
+
+    <div class="cm-kpi-card cm-card-orange">
+        <div class="cm-kpi-top">
+            <div class="cm-kpi-icon-box cm-icon-orange">
+                <i data-feather="award"></i>
+            </div>
+            <span class="cm-kpi-title">Team Leads</span>
+        </div>
+        <div class="cm-kpi-bottom">
+            <span class="cm-kpi-number" id="statTeamLeads">0</span>
+            <span class="cm-trend-pill" style="background:#fff7ed; color:#ea580c;">Department Heads</span>
+        </div>
     </div>
-    <div class="card" style="padding:18px;">
-        <span style="color:var(--text-muted); font-size:12px; font-weight:700; text-transform:uppercase;">Developers & Staff</span>
-        <h3 id="statDevelopers" style="font-size:24px; font-weight:800; color:#16a34a; margin-top:4px;">0</h3>
+
+    <div class="cm-kpi-card cm-card-green">
+        <div class="cm-kpi-top">
+            <div class="cm-kpi-icon-box cm-icon-green">
+                <i data-feather="user-check"></i>
+            </div>
+            <span class="cm-kpi-title">Developers &amp; Staff</span>
+        </div>
+        <div class="cm-kpi-bottom">
+            <span class="cm-kpi-number" id="statDevelopers">0</span>
+            <span class="cm-trend-pill" style="background:#ecfdf5; color:#10b981;">Execution Team</span>
+        </div>
     </div>
 </div>
 
-<!-- Filter Bar & User Directory Table -->
-<div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-        <div style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
-            <input type="text" id="userSearchInput" class="form-control" style="max-width:260px;" placeholder="Search name, username, email..." onkeyup="filterUsersTable()">
-            <select id="roleFilter" class="form-select" style="max-width:200px;" onchange="fetchUsersList()">
-                <option value="0">All System Roles</option>
-                <?php foreach ($roles as $r): ?>
-                    <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <select id="deptFilter" class="form-select" style="max-width:200px;" onchange="fetchUsersList()">
-                <option value="">All Departments</option>
-                <?php foreach ($departments as $d): ?>
-                    <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick="fetchUsersList()">
-            <i data-feather="refresh-cw"></i> Refresh Directory
+<!-- Filter Bar -->
+<div class="cm-filter-bar">
+    <div class="cm-search-wrapper">
+        <i data-feather="search"></i>
+        <input type="text" id="userSearchInput" class="cm-search-input" placeholder="Search name, username, email..." onkeyup="filterUsersTable()">
+    </div>
+    <div class="cm-filter-dropdowns">
+        <select id="roleFilter" class="cm-filter-select" onchange="fetchUsersList()">
+            <option value="0">All System Roles</option>
+            <?php foreach ($roles as $r): ?>
+                <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select id="deptFilter" class="cm-filter-select" onchange="fetchUsersList()">
+            <option value="">All Departments</option>
+            <?php foreach ($departments as $d): ?>
+                <option value="<?= htmlspecialchars($d) ?>"><?= htmlspecialchars($d) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="button" class="cm-btn-pill-white" onclick="fetchUsersList()" style="padding:7px 16px; font-size:12.5px;">
+            <i data-feather="refresh-cw" style="width:13px; height:13px;"></i>
+            <span>Refresh</span>
         </button>
     </div>
+</div>
 
-    <div class="table-responsive">
-        <table class="table" style="width:100%; font-size:14px;">
+<!-- User Directory Table Card -->
+<div class="cm-table-card">
+    <div class="cm-table-wrapper">
+        <table class="cm-table">
             <thead>
                 <tr>
-                    <th>User & Identity</th>
+                    <th>User &amp; Identity</th>
                     <th>Email Address</th>
                     <th>System Role</th>
                     <th>Department</th>
                     <th>Account Status</th>
                     <th>Chat Privileges</th>
-                    <th>Invite / Signup Token</th>
-                    <th>Created Date</th>
+                    <th>Invite / Token</th>
+                    <th>Created</th>
                     <th style="text-align:right;">Actions</th>
                 </tr>
             </thead>
             <tbody id="usersTbody">
-                <tr><td colspan="9" style="text-align:center; padding:30px;">Loading user accounts...</td></tr>
+                <tr><td colspan="9" style="text-align:center; padding:35px; color:#64748b;">Loading user accounts...</td></tr>
             </tbody>
         </table>
     </div>
@@ -533,13 +990,23 @@ if (empty($departments)) {
         const protocol = window.location.protocol;
         const host = window.location.host;
 
+        const avatarPalettes = [
+            { bg: '#f3e8ff', text: '#7c3aed' },
+            { bg: '#e0f2fe', text: '#0284c7' },
+            { bg: '#ffedd5', text: '#ea580c' },
+            { bg: '#fce7f3', text: '#db2777' },
+            { bg: '#cffafe', text: '#0891b2' },
+            { bg: '#ecfdf5', text: '#059669' }
+        ];
+
         let html = '';
-        users.forEach(u => {
-            let roleBadgeClass = 'badge-primary';
-            if (u.role_name.includes('Admin')) roleBadgeClass = 'badge-danger';
-            else if (u.role_name.includes('Lead')) roleBadgeClass = 'badge-primary';
-            else if (u.role_name.includes('Developer')) roleBadgeClass = 'badge-success';
-            else if (u.role_name.includes('Sales')) roleBadgeClass = 'badge-warning';
+        users.forEach((u, idx) => {
+            const palette = avatarPalettes[idx % avatarPalettes.length];
+            const names = (u.full_name || 'User').trim().split(/\s+/);
+            let initials = names.length >= 2 ? (names[0][0] + names[1][0]).toUpperCase() : names[0].substring(0, 2).toUpperCase();
+
+            let roleBadgeClass = 'cm-portal-pill';
+            if (u.role_name.includes('Admin')) roleBadgeClass = 'cm-portal-pill';
 
             let editBtnHtml = '';
             let resetBtnHtml = '';
@@ -548,34 +1015,36 @@ if (empty($departments)) {
             const isTargetSuperAdmin = (parseInt(u.role_id) === 1 || u.role_name === 'Super Admin');
 
             if (!isSuperAdmin && isTargetSuperAdmin) {
-                actionButtonsHtml = `<span class="badge badge-secondary" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-weight:600;">🔒 Protected (Super Admin)</span>`;
+                actionButtonsHtml = `<span class="cm-portal-pill" style="background:#f1f5f9; color:#64748b;">🔒 Protected</span>`;
             } else {
                 editBtnHtml = `
-                    <button class="btn btn-outline btn-sm" onclick="openEditUserModal(${u.id})" title="Edit User Details">
-                        <i data-feather="edit-2"></i> Edit
+                    <button type="button" class="cm-action-icon-btn" onclick="openEditUserModal(${u.id})" title="Edit User Details">
+                        <i data-feather="edit-2"></i>
                     </button>
                 `;
                 if (isSuperAdmin) {
                     resetBtnHtml = `
-                        <button class="btn btn-outline btn-sm" onclick="openResetUserPasswordModal(${u.id}, '${escapeHtml(u.username)}', '${escapeHtml(u.full_name)}')" style="margin-left:4px;" title="Reset User Password">
-                            <i data-feather="key"></i> Reset
+                        <button type="button" class="cm-action-icon-btn" onclick="openResetUserPasswordModal(${u.id}, '${escapeHtml(u.username)}', '${escapeHtml(u.full_name)}')" title="Reset User Password">
+                            <i data-feather="key"></i>
                         </button>
                     `;
                     if (parseInt(u.id) !== currentUserId) {
                         deleteBtnHtml = `
-                            <button class="btn btn-outline-danger btn-sm" onclick="deleteUserAccount(${u.id}, '${escapeHtml(u.username)}')" style="margin-left:4px;" title="Delete User Account">
-                                <i data-feather="trash-2"></i> Delete
+                            <button type="button" class="cm-action-icon-btn" style="color:#dc2626;" onclick="deleteUserAccount(${u.id}, '${escapeHtml(u.username)}')" title="Delete User Account">
+                                <i data-feather="trash-2"></i>
                             </button>
                         `;
                     }
                 }
                 actionButtonsHtml = `
-                    ${editBtnHtml}
-                    <button class="btn ${u.is_active ? 'btn-outline' : 'btn-success'} btn-sm" onclick="toggleUserStatus(${u.id})" style="margin-left:4px;">
-                        <i data-feather="${u.is_active ? 'user-minus' : 'user-check'}"></i> ${u.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    ${resetBtnHtml}
-                    ${deleteBtnHtml}
+                    <div style="display:flex; justify-content:flex-end; gap:6px; align-items:center;">
+                        ${editBtnHtml}
+                        <button type="button" class="cm-action-icon-btn" style="color:${u.is_active ? '#dc2626' : '#16a34a'};" onclick="toggleUserStatus(${u.id})" title="${u.is_active ? 'Deactivate User' : 'Activate User'}">
+                            <i data-feather="${u.is_active ? 'user-x' : 'user-check'}"></i>
+                        </button>
+                        ${resetBtnHtml}
+                        ${deleteBtnHtml}
+                    </div>
                 `;
             }
 
@@ -583,7 +1052,7 @@ if (empty($departments)) {
             if (u.signup_token) {
                 const signupUrl = `${protocol}//${host}/signup.php?token=${u.signup_token}`;
                 signupLinkBtn = `
-                    <button class="btn btn-outline btn-sm" style="color:#2563eb; border-color:#93c5fd; margin-top:4px;" onclick="copySignupUrl('${signupUrl}')" title="Copy Signup / Password Link">
+                    <button class="cm-btn-pill-white" style="margin-top:4px; font-size:11px; padding:3px 10px;" onclick="copySignupUrl('${signupUrl}')" title="Copy Signup / Password Link">
                         📋 Copy Invite Link
                     </button>
                 `;
@@ -592,20 +1061,32 @@ if (empty($departments)) {
             html += `
                 <tr>
                     <td>
-                        <strong>${escapeHtml(u.full_name)}</strong><br>
-                        <small style="color:#64748b;">@${escapeHtml(u.username)}</small>
+                        <div class="cm-client-cell">
+                            <div class="cm-avatar" style="background:${palette.bg}; color:${palette.text};">
+                                ${escapeHtml(initials)}
+                            </div>
+                            <div class="cm-client-info">
+                                <span style="font-size:14px; font-weight:700; color:#0f172a;">${escapeHtml(u.full_name)}</span>
+                                <span class="cm-contact-sub" style="font-family:monospace;">@${escapeHtml(u.username)}</span>
+                            </div>
+                        </div>
                     </td>
-                    <td>${escapeHtml(u.email)}</td>
-                    <td><span class="badge ${roleBadgeClass}">${escapeHtml(u.role_name)}</span></td>
-                    <td><span class="badge badge-secondary">${escapeHtml(u.department || 'General')}</span></td>
                     <td>
-                        <span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">
-                            ${u.is_active ? 'Active' : 'Inactive'}
+                        <div class="cm-meta-line">
+                            <i data-feather="mail"></i>
+                            <span>${escapeHtml(u.email)}</span>
+                        </div>
+                    </td>
+                    <td><span class="cm-portal-pill" style="background:#eff6ff; color:#2563eb;">${escapeHtml(u.role_name)}</span></td>
+                    <td><span class="cm-portal-pill" style="background:#f1f5f9; color:#475569;">${escapeHtml(u.department || 'General')}</span></td>
+                    <td>
+                        <span class="cm-status-pill ${u.is_active ? 'cm-status-active' : 'cm-status-suspended'}">
+                            <span class="cm-status-dot">●</span> ${u.is_active ? 'Active' : 'Inactive'}
                         </span>
                     </td>
                     <td>
                         ${parseInt(u.role_id) === 7
-                            ? `<span class="badge badge-secondary" style="font-size:11px;">Client (N/A)</span>`
+                            ? `<span class="cm-portal-pill" style="background:#f1f5f9; color:#94a3b8; font-size:11px;">Client (N/A)</span>`
                             : (() => {
                                 const canChat = parseInt(u.can_chat ?? 1) === 1;
                                 const canGrp = canChat && parseInt(u.can_create_group ?? 1) === 1;
@@ -624,7 +1105,7 @@ if (empty($departments)) {
                         }
                     </td>
                     <td>
-                        ${u.signup_token ? '<span class="badge badge-warning">Invite Link Active</span>' : '<span style="color:#64748b; font-size:12px;">Password Set</span>'}
+                        ${u.signup_token ? '<span class="cm-status-pill cm-status-pending"><span class="cm-status-dot">●</span> Invite Active</span>' : '<span style="color:#64748b; font-size:12px;">Password Set</span>'}
                         <br>${signupLinkBtn}
                     </td>
                     <td style="font-size:12px; color:#64748b;">${u.created_at ? u.created_at.substring(0, 10) : 'N/A'}</td>

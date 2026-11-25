@@ -186,7 +186,7 @@ require_once __DIR__ . '/header.php';
 
     <a href="template_generator.php" class="btn-pill-white" style="text-decoration:none;">
         <i data-feather="file-text" class="icon-tag"></i>
-        <span>Generate Document</span>
+        <span>Generate Proposal</span>
     </a>
 </div>
 

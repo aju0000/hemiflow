@@ -75,7 +75,7 @@ require_once __DIR__ . '/header.php';
         </button>
         <?php if ($isSuperAdmin): ?>
         <button id="tabBtn5" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0;" onclick="switchTab(5)">
-            🛡️ Super Admin: Task & Project Time Tracking
+            📊 Super Admin: Task Work Report (Month / Week / Day)
         </button>
         <?php endif; ?>
     </div>
@@ -198,92 +198,170 @@ require_once __DIR__ . '/header.php';
     </div>
 
     <?php if ($isSuperAdmin): ?>
-    <!-- TAB 5: Super Admin Task Completion (Day / Month / Date Range) & Project Time Tracking -->
+    <!-- TAB 5: Super Admin Task Work Report (Month / Week / Day) & Execution Analytics -->
     <div id="tabContent5" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; background:#ffffff; border:1px solid #f1f5f9; border-radius:16px; padding:16px 20px; margin-bottom:20px; box-shadow:0 4px 20px rgba(0,0,0,0.025);">
             <div>
-                <h3 style="font-size:16px; font-weight:800; color:#0f172a; margin:0 0 4px 0;">🛡️ Super Admin: Employee Completed Tasks Tracker</h3>
-                <p style="font-size:12.5px; color:#64748b; margin:0;">Filter completed tasks per employee by Day, Month, or Custom Date Range.</p>
+                <h3 style="font-size:16.5px; font-weight:800; color:#0f172a; margin:0 0 4px 0; display:flex; align-items:center; gap:8px;">
+                    <span>🛡️</span>
+                    <span>Super Admin Task Work &amp; Execution Report</span>
+                </h3>
+                <p style="font-size:12.5px; color:#64748b; margin:0;">Filter task execution, workload, and developer clearance by Month-wise, Week-wise, or Day-base.</p>
             </div>
+            
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button type="button" id="saBtnDay" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('day')">📅 Per Day</button>
-                <button type="button" id="saBtnMonth" class="btn btn-primary btn-sm" onclick="setSaAnalyticsMode('month')">🗓️ Per Month</button>
-                <button type="button" id="saBtnRange" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('range')">📊 Date Range</button>
+                <!-- Granularity Switcher -->
+                <div style="display:inline-flex; background:#f1f5f9; padding:3px; border-radius:999px; border:1px solid #e2e8f0;">
+                    <button type="button" id="saBtnDay" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('day')" style="border-radius:999px; border:none; padding:5px 14px; font-weight:700;">📅 Day-base</button>
+                    <button type="button" id="saBtnWeek" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('week')" style="border-radius:999px; border:none; padding:5px 14px; font-weight:700;">🗓️ Week-wise</button>
+                    <button type="button" id="saBtnMonth" class="btn btn-primary btn-sm" onclick="setSaAnalyticsMode('month')" style="border-radius:999px; border:none; padding:5px 14px; font-weight:700;">📊 Month-wise</button>
+                    <button type="button" id="saBtnRange" class="btn btn-outline btn-sm" onclick="setSaAnalyticsMode('range')" style="border-radius:999px; border:none; padding:5px 14px; font-weight:700;">📆 Date Range</button>
+                </div>
 
-                <input type="date" id="sa_date" class="form-control" value="<?= date('Y-m-d') ?>" style="display:none; width:150px; padding:5px 8px; font-size:12.5px;">
-                <input type="month" id="sa_month" class="form-control" value="<?= date('Y-m') ?>" style="display:inline-block; width:155px; padding:5px 8px; font-size:12.5px;">
+                <!-- Inputs based on mode -->
+                <input type="date" id="sa_date" class="form-control" value="<?= date('Y-m-d') ?>" style="display:none; width:145px; border-radius:999px; font-size:12.5px;">
+                <input type="week" id="sa_week" class="form-control" value="<?= date('Y-\WW') ?>" style="display:none; width:150px; border-radius:999px; font-size:12.5px;">
+                <input type="month" id="sa_month" class="form-control" value="<?= date('Y-m') ?>" style="display:inline-block; width:150px; border-radius:999px; font-size:12.5px;">
+                
                 <span id="sa_range_inputs" style="display:none; align-items:center; gap:6px;">
-                    <input type="date" id="sa_start_date" class="form-control" value="<?= date('Y-m-01') ?>" style="width:140px; padding:5px 8px; font-size:12.5px;">
+                    <input type="date" id="sa_start_date" class="form-control" value="<?= date('Y-m-01') ?>" style="width:135px; border-radius:999px; font-size:12.5px;">
                     <span style="font-size:12px; color:#64748b;">to</span>
-                    <input type="date" id="sa_end_date" class="form-control" value="<?= date('Y-m-d') ?>" style="width:140px; padding:5px 8px; font-size:12.5px;">
+                    <input type="date" id="sa_end_date" class="form-control" value="<?= date('Y-m-d') ?>" style="width:135px; border-radius:999px; font-size:12.5px;">
                 </span>
-                <button type="button" class="btn btn-primary btn-sm" onclick="loadSuperAdminAnalytics()">Apply Filter</button>
+
+                <select id="sa_department" class="form-control" style="width:160px; border-radius:999px; font-size:12.5px;" onchange="loadSuperAdminAnalytics()">
+                    <option value="">All Departments</option>
+                    <?php 
+                    $saDepts = $db->query("SELECT DISTINCT department FROM tasks WHERE department IS NOT NULL AND department != '' ORDER BY department ASC")->fetchAll(PDO::FETCH_COLUMN);
+                    foreach ($saDepts as $dp): ?>
+                        <option value="<?= htmlspecialchars($dp) ?>"><?= htmlspecialchars($dp) ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <button type="button" class="btn btn-primary btn-sm" onclick="loadSuperAdminAnalytics()" style="border-radius:999px; padding:6px 16px; font-weight:700;">
+                    <span>Apply Filter</span>
+                </button>
+
+                <button type="button" class="btn btn-danger btn-sm" onclick="downloadSaReportPdf()" style="border-radius:999px; padding:6px 16px; font-weight:700; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border:none; display:inline-flex; align-items:center; gap:4px;">
+                    <i data-feather="file-text" style="width:13px; height:13px;"></i>
+                    <span>Download PDF</span>
+                </button>
             </div>
         </div>
 
+        <!-- 6 Executive KPI Metric Cards -->
         <div class="grid-4" style="margin-bottom:20px;">
-            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:14px; text-align:center;">
-                <p style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase;">Tasks Completed in Period</p>
-                <h2 id="sa_total_completed" style="font-size:24px; font-weight:800; color:#1d4ed8; margin:4px 0;">--</h2>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase; margin-bottom:4px;">Total Tasks in Period</p>
+                <h2 id="sa_total_tasks" style="font-size:26px; font-weight:800; color:#1d4ed8; margin:2px 0;">--</h2>
                 <small id="sa_period_label" style="color:#2563eb; font-size:11.5px;">--</small>
             </div>
-            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px; text-align:center;">
-                <p style="font-size:11px; font-weight:700; color:#15803d; text-transform:uppercase;">Employees With Completions</p>
-                <h2 id="sa_active_staff" style="font-size:24px; font-weight:800; color:#16a34a; margin:4px 0;">--</h2>
-                <small style="color:#15803d; font-size:11.5px;">Within Selected Range</small>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#15803d; text-transform:uppercase; margin-bottom:4px;">Completed Tasks</p>
+                <h2 id="sa_total_completed" style="font-size:26px; font-weight:800; color:#16a34a; margin:2px 0;">--</h2>
+                <small id="sa_clearance_rate" style="color:#15803d; font-size:11.5px; font-weight:700;">Clearance: --%</small>
             </div>
-            <div style="background:#fefce8; border:1px solid #fde047; border-radius:8px; padding:14px; text-align:center;">
-                <p style="font-size:11px; font-weight:700; color:#a16207; text-transform:uppercase;">Completed Projects</p>
-                <h2 id="sa_completed_projects" style="font-size:24px; font-weight:800; color:#ca8a04; margin:4px 0;">--</h2>
-                <small id="sa_sla_projects_sub" style="color:#a16207; font-size:11.5px;">--</small>
+            <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#b45309; text-transform:uppercase; margin-bottom:4px;">In Progress &amp; Active</p>
+                <h2 id="sa_in_progress" style="font-size:26px; font-weight:800; color:#d97706; margin:2px 0;">--</h2>
+                <small id="sa_review_sub" style="color:#b45309; font-size:11.5px;">Under Review: --</small>
             </div>
-            <div style="background:#faf5ff; border:1px solid #e9d5ff; border-radius:8px; padding:14px; text-align:center;">
-                <p style="font-size:11px; font-weight:700; color:#6b21a8; text-transform:uppercase;">Avg Project Time Taken</p>
-                <h2 id="sa_avg_proj_days" style="font-size:24px; font-weight:800; color:#7e22ce; margin:4px 0;">--</h2>
-                <small id="sa_avg_proj_hours" style="color:#6b21a8; font-size:11.5px;">--</small>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px; text-align:center;">
+                <p style="font-size:11px; font-weight:700; color:#b91c1c; text-transform:uppercase; margin-bottom:4px;">SLA Pass Rate</p>
+                <h2 id="sa_sla_pass" style="font-size:26px; font-weight:800; color:#dc2626; margin:2px 0;">--</h2>
+                <small id="sa_sla_breaches" style="color:#dc2626; font-size:11.5px; font-weight:700;">Breaches: 0</small>
             </div>
         </div>
 
-        <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 10px 0;">Employee Completed Tasks Count</h4>
-        <div class="table-responsive" style="margin-bottom:26px;">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Employee</th>
-                        <th>Department</th>
-                        <th>Role</th>
-                        <th>Completed Tasks</th>
-                        <th>Main Tasks</th>
-                        <th>Sub-Tasks</th>
-                        <th>Recent Completed Task(s)</th>
-                    </tr>
-                </thead>
-                <tbody id="saEmployeeCompletionsBody">
-                    <tr><td colspan="7" style="text-align:center; padding:20px;">Loading employee completion metrics...</td></tr>
-                </tbody>
-            </table>
+        <!-- Section 1: Staff Workload & Output Breakdown -->
+        <div class="card" style="margin-bottom:20px; border-radius:16px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h4 style="font-size:15px; font-weight:800; color:#0f172a; margin:0;">
+                    👥 Employee Productivity &amp; Clearance Leaderboard
+                </h4>
+                <span class="badge badge-primary" id="sa_active_staff_badge">Loading Staff...</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th>Role</th>
+                            <th style="text-align:center;">Assigned</th>
+                            <th style="text-align:center;">Completed</th>
+                            <th style="text-align:center;">In Progress</th>
+                            <th style="text-align:center;">Review</th>
+                            <th style="text-align:center;">Breached</th>
+                            <th style="text-align:center;">Clearance %</th>
+                            <th>Recent Tasks</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saEmployeeCompletionsBody">
+                        <tr><td colspan="10" style="text-align:center; padding:20px;">Loading employee metrics...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <h4 style="font-size:14.5px; font-weight:700; color:#0f172a; margin:0 0 10px 0;">⏱️ Project Completion Time Tracker</h4>
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Project</th>
-                        <th>Client</th>
-                        <th>Team Lead</th>
-                        <th>Start Date</th>
-                        <th>Deadline</th>
-                        <th>Completed At</th>
-                        <th>Time Taken</th>
-                        <th>Tasks Done</th>
-                        <th>Status / SLA</th>
-                    </tr>
-                </thead>
-                <tbody id="saProjectDurationsBody">
-                    <tr><td colspan="9" style="text-align:center; padding:20px;">Loading project completion durations...</td></tr>
-                </tbody>
-            </table>
+        <!-- Section 2: Comprehensive Task Ledger -->
+        <div class="card" style="margin-bottom:20px; border-radius:16px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h4 style="font-size:15px; font-weight:800; color:#0f172a; margin:0;">
+                    📋 Task Execution Ledger (<span id="saLedgerCount">0</span> Tasks in Period)
+                </h4>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">Task Code</th>
+                            <th>Title</th>
+                            <th>Project / Client</th>
+                            <th>Assignee</th>
+                            <th>Department</th>
+                            <th style="text-align:center;">Status</th>
+                            <th style="text-align:center;">Created</th>
+                            <th style="text-align:center;">Deadline</th>
+                            <th style="text-align:center;">Completed</th>
+                            <th style="text-align:center;">SLA State</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saTaskLedgerBody">
+                        <tr><td colspan="10" style="text-align:center; padding:20px;">Loading task ledger...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 3: Project Completion Duration Tracker -->
+        <div class="card" style="border-radius:16px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h4 style="font-size:15px; font-weight:800; color:#0f172a; margin:0;">
+                    ⏱️ Project Completion &amp; Time Tracking
+                </h4>
+                <span id="sa_project_summary_badge" class="badge badge-secondary">Loading...</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Client</th>
+                            <th>Team Lead</th>
+                            <th>Start Date</th>
+                            <th>Deadline</th>
+                            <th>Completed At</th>
+                            <th>Time Taken</th>
+                            <th>Tasks Done</th>
+                            <th>Status / SLA</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saProjectDurationsBody">
+                        <tr><td colspan="9" style="text-align:center; padding:20px;">Loading project completion durations...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     <?php endif; ?>
@@ -437,15 +515,36 @@ require_once __DIR__ . '/header.php';
     let saAnalyticsMode = 'month';
     function setSaAnalyticsMode(mode) {
         saAnalyticsMode = mode;
-        const map = { day: 'saBtnDay', month: 'saBtnMonth', range: 'saBtnRange' };
+        const map = { day: 'saBtnDay', week: 'saBtnWeek', month: 'saBtnMonth', range: 'saBtnRange' };
         Object.keys(map).forEach(k => {
             const b = document.getElementById(map[k]);
-            if (b) b.className = k === mode ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+            if (b) {
+                b.className = k === mode ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+                b.style.fontWeight = '700';
+            }
         });
         document.getElementById('sa_date').style.display = mode === 'day' ? 'inline-block' : 'none';
+        document.getElementById('sa_week').style.display = mode === 'week' ? 'inline-block' : 'none';
         document.getElementById('sa_month').style.display = mode === 'month' ? 'inline-block' : 'none';
         document.getElementById('sa_range_inputs').style.display = mode === 'range' ? 'inline-flex' : 'none';
         loadSuperAdminAnalytics();
+    }
+
+    function downloadSaReportPdf() {
+        const params = new URLSearchParams({ mode: saAnalyticsMode, autoprint: '1' });
+        if (saAnalyticsMode === 'day') {
+            params.set('date', document.getElementById('sa_date').value);
+        } else if (saAnalyticsMode === 'week') {
+            params.set('week', document.getElementById('sa_week').value);
+        } else if (saAnalyticsMode === 'month') {
+            params.set('month', document.getElementById('sa_month').value);
+        } else {
+            params.set('start_date', document.getElementById('sa_start_date').value);
+            params.set('end_date', document.getElementById('sa_end_date').value);
+        }
+        const dept = document.getElementById('sa_department').value;
+        if (dept) params.set('department', dept);
+        window.open('task_report_pdf.php?' + params.toString(), '_blank');
     }
 
     function escapeReportHtml(str) {
@@ -456,12 +555,16 @@ require_once __DIR__ . '/header.php';
         const params = new URLSearchParams({ action: 'superadmin_task_project_analytics', mode: saAnalyticsMode });
         if (saAnalyticsMode === 'day') {
             params.set('date', document.getElementById('sa_date').value);
+        } else if (saAnalyticsMode === 'week') {
+            params.set('week', document.getElementById('sa_week').value);
         } else if (saAnalyticsMode === 'month') {
             params.set('month', document.getElementById('sa_month').value);
         } else {
             params.set('start_date', document.getElementById('sa_start_date').value);
             params.set('end_date', document.getElementById('sa_end_date').value);
         }
+        const dept = document.getElementById('sa_department').value;
+        if (dept) params.set('department', dept);
 
         fetch('api.php?' + params.toString())
             .then(r => r.json())
@@ -473,20 +576,50 @@ require_once __DIR__ . '/header.php';
                 const s = data.summary || {};
                 const f = data.filter || {};
                 const ps = data.project_duration_summary || {};
-                document.getElementById('sa_total_completed').textContent = s.total_completed_tasks ?? 0;
-                document.getElementById('sa_period_label').textContent = `${f.start_date || ''} → ${f.end_date || ''}`;
-                document.getElementById('sa_active_staff').textContent = `${s.active_employees_with_completions ?? 0} / ${s.total_staff ?? 0}`;
-                document.getElementById('sa_completed_projects').textContent = `${ps.completed_projects ?? 0} / ${ps.total_projects ?? 0}`;
-                document.getElementById('sa_sla_projects_sub').textContent = `On Time: ${ps.on_time_count ?? 0} • Overdue: ${ps.overdue_count ?? 0}`;
-                document.getElementById('sa_avg_proj_days').textContent = `${ps.avg_completion_days ?? 0} Days`;
-                document.getElementById('sa_avg_proj_hours').textContent = `${ps.avg_completion_hours ?? 0} Hours Average`;
 
+                // Update KPI Cards
+                const totalT = s.total_tasks ?? 0;
+                const compT = s.total_completed_tasks ?? 0;
+                const inProgT = s.in_progress_tasks ?? 0;
+                const revT = (s.review_tasks ?? 0) + (s.revision_tasks ?? 0);
+                const clearRate = s.clearance_rate ?? (totalT > 0 ? Math.round((compT / totalT) * 100) : 0);
+                const slaPassRate = s.sla_pass_rate ?? 100;
+                const breaches = s.sla_breaches ?? 0;
+
+                const elTotal = document.getElementById('sa_total_tasks');
+                if (elTotal) elTotal.textContent = totalT;
+
+                document.getElementById('sa_total_completed').textContent = compT;
+                const elClr = document.getElementById('sa_clearance_rate');
+                if (elClr) elClr.textContent = `Clearance: ${clearRate}% (${compT}/${totalT})`;
+
+                const elInProg = document.getElementById('sa_in_progress');
+                if (elInProg) elInProg.textContent = inProgT;
+                const elRevSub = document.getElementById('sa_review_sub');
+                if (elRevSub) elRevSub.textContent = `Review & Rev: ${revT} | Pending: ${s.pending_tasks ?? 0}`;
+
+                const elSlaPass = document.getElementById('sa_sla_pass');
+                if (elSlaPass) elSlaPass.textContent = `${slaPassRate}%`;
+                const elSlaBr = document.getElementById('sa_sla_breaches');
+                if (elSlaBr) elSlaBr.textContent = `Breaches: ${breaches}`;
+
+                document.getElementById('sa_period_label').textContent = `${f.start_date || ''} → ${f.end_date || ''}`;
+
+                const staffBadge = document.getElementById('sa_active_staff_badge');
+                if (staffBadge) staffBadge.textContent = `${s.active_employees_with_completions ?? 0} Active / ${s.total_staff ?? 0} Staff`;
+
+                const projBadge = document.getElementById('sa_project_summary_badge');
+                if (projBadge) projBadge.textContent = `Completed: ${ps.completed_projects ?? 0} / ${ps.total_projects ?? 0} | Avg: ${ps.avg_completion_days ?? 0}d (${ps.avg_completion_hours ?? 0}h)`;
+
+                // 1. Staff Leaderboard Table
                 const empBody = document.getElementById('saEmployeeCompletionsBody');
                 const emps = data.employee_completions || [];
                 if (emps.length === 0) {
-                    empBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">No employees found.</td></tr>';
+                    empBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px;">No employee records found.</td></tr>';
                 } else {
                     empBody.innerHTML = emps.map(e => {
+                        const assigned = e.assigned_count ?? e.completed_count ?? 0;
+                        const cRate = assigned > 0 ? Math.round((e.completed_count / assigned) * 100) : (e.completed_count > 0 ? 100 : 0);
                         const taskLinks = (e.tasks || []).slice(0, 4).map(t => `<a href="task_details.php?id=${t.id}" class="badge badge-secondary" style="text-decoration:none; margin:2px; font-size:10.5px;">${escapeReportHtml(t.task_code)}: ${escapeReportHtml(t.title)}</a>`).join(' ');
                         const extra = (e.tasks || []).length > 4 ? ` <small style="color:#64748b;">+${e.tasks.length - 4} more</small>` : '';
                         return `
@@ -494,15 +627,51 @@ require_once __DIR__ . '/header.php';
                                 <td><strong>${escapeReportHtml(e.full_name)}</strong></td>
                                 <td>${escapeReportHtml(e.department)}</td>
                                 <td><span class="badge badge-secondary">${escapeReportHtml(e.role_name)}</span></td>
-                                <td><span class="badge ${e.completed_count > 0 ? 'badge-success' : 'badge-secondary'}" style="font-size:12.5px;">${e.completed_count}</span></td>
-                                <td>${e.main_tasks_completed}</td>
-                                <td>${e.subtasks_completed}</td>
+                                <td style="text-align:center; font-weight:700;">${assigned}</td>
+                                <td style="text-align:center;"><span class="badge ${e.completed_count > 0 ? 'badge-success' : 'badge-secondary'}" style="font-size:12.5px;">${e.completed_count}</span></td>
+                                <td style="text-align:center; color:#2563eb;">${e.in_progress_count ?? 0}</td>
+                                <td style="text-align:center; color:#d97706;">${e.review_count ?? 0}</td>
+                                <td style="text-align:center; font-weight:700; color:#dc2626;">${e.breached_count ?? 0}</td>
+                                <td style="text-align:center;"><span class="badge ${cRate >= 70 ? 'badge-success' : (cRate >= 40 ? 'badge-warning' : 'badge-secondary')}">${cRate}%</span></td>
                                 <td>${taskLinks || '<span style="color:#94a3b8;">--</span>'}${extra}</td>
                             </tr>
                         `;
                     }).join('');
                 }
 
+                // 2. Comprehensive Task Ledger
+                const ledgerBody = document.getElementById('saTaskLedgerBody');
+                const ledgerCount = document.getElementById('saLedgerCount');
+                const ledger = data.task_ledger || [];
+                if (ledgerCount) ledgerCount.textContent = ledger.length;
+
+                if (ledgerBody) {
+                    if (ledger.length === 0) {
+                        ledgerBody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px;">No tasks found in this period.</td></tr>';
+                    } else {
+                        ledgerBody.innerHTML = ledger.map(t => {
+                            const st = (t.status || '').toUpperCase();
+                            const stBadge = st === 'COMPLETED' ? 'badge-success' : (st.includes('PROGRESS') ? 'badge-primary' : (st.includes('REVIEW') ? 'badge-warning' : 'badge-secondary'));
+                            const slaBadge = t.is_breached ? 'badge-danger' : 'badge-success';
+                            return `
+                                <tr>
+                                    <td><a href="task_details.php?id=${t.id}" style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#2563eb; text-decoration:none;">${escapeReportHtml(t.task_code)}</a></td>
+                                    <td><strong>${escapeReportHtml(t.title)}</strong></td>
+                                    <td>${escapeReportHtml(t.company_name)} - ${escapeReportHtml(t.project_name)}</td>
+                                    <td>${escapeReportHtml(t.assigned_to_name)}</td>
+                                    <td>${escapeReportHtml(t.department)}</td>
+                                    <td style="text-align:center;"><span class="badge ${stBadge}">${escapeReportHtml(t.status)}</span></td>
+                                    <td style="text-align:center;">${escapeReportHtml(t.created_at)}</td>
+                                    <td style="text-align:center;">${escapeReportHtml(t.deadline)}</td>
+                                    <td style="text-align:center; font-weight:700; color:#16a34a;">${escapeReportHtml(t.completed_at)}</td>
+                                    <td style="text-align:center;"><span class="badge ${slaBadge}">${escapeReportHtml(t.sla_status)}</span></td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+
+                // 3. Project Durations
                 const projBody = document.getElementById('saProjectDurationsBody');
                 const projs = data.project_durations || [];
                 if (projs.length === 0) {
@@ -525,6 +694,7 @@ require_once __DIR__ . '/header.php';
                         `;
                     }).join('');
                 }
+                if (typeof feather !== 'undefined') feather.replace();
             });
     }
 

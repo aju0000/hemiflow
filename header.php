@@ -447,10 +447,10 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
             <div class="nav-label" style="margin-top:10px;">Modules</div>
             
             <?php if (hasModuleAccess('template-generator')): ?>
-            <!-- Module 3: Template Generator -->
+            <!-- Module 3: Proposal -->
             <a href="template_generator.php" class="nav-item <?= $currentScript === 'template_generator.php' ? 'active' : '' ?>">
                 <i data-feather="file-text"></i>
-                <span>Template Generator</span>
+                <span>Proposal</span>
             </a>
             <?php endif; ?>
 
@@ -470,7 +470,7 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
             ?>
             <a href="projects.php?view=projects" class="nav-item <?= $isCurrentProjectsPage ? 'active' : '' ?>">
                 <i data-feather="folder"></i>
-                <span>Current Projects</span>
+                <span>Projects</span>
             </a>
             <a href="projects.php" class="nav-item <?= $isTasksWorkspacePage ? 'active' : '' ?>">
                 <i data-feather="check-square"></i>
@@ -479,6 +479,15 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
             <a href="calendar.php" class="nav-item <?= $currentScript === 'calendar.php' ? 'active' : '' ?>">
                 <i data-feather="calendar"></i>
                 <span>Task Calendar</span>
+            </a>
+            <?php endif; ?>
+
+            <?php /* Daily Worklog feature hidden as requested */ ?>
+            <?php if (false && ($user['role'] ?? '') !== 'Client'): ?>
+            <!-- Daily Worklog for Employees, Leads, HR & Super Admin -->
+            <a href="worklog.php" class="nav-item <?= $currentScript === 'worklog.php' ? 'active' : '' ?>">
+                <i data-feather="clock"></i>
+                <span>Daily Worklog</span>
             </a>
             <?php endif; ?>
 
@@ -691,7 +700,7 @@ $canUserCreateGroup = !empty($chatPriv['can_create_group']);
                             <?php if (hasModuleAccess('task-management')): ?>
                                 <a href="projects.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">View Task Workspace &rarr;</a>
                             <?php elseif (hasModuleAccess('template-generator')): ?>
-                                <a href="template_generator.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">Open Template Generator &rarr;</a>
+                                <a href="template_generator.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">Open Proposal &rarr;</a>
                             <?php else: ?>
                                 <a href="index.php" style="font-size:11.5px; font-weight:600; color:#2563eb; text-decoration:none;">View Dashboard &rarr;</a>
                             <?php endif; ?>

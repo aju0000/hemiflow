@@ -21,12 +21,15 @@ header('Content-Disposition: attachment; filename="' . $filename . '"');
 
 $output = fopen('php://output', 'w');
 
-if ($type === 'employees') {
-    // Export Employees Master List
-    fputcsv($output, ['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Joining Date', 'Employment Type', 'Status', 'Work Location']);
+if ($type === 'employees' || $type === 'monthly_employees') {
+    // Export Employees Master List (optionally with month metrics)
+    $month = $_GET['month'] ?? '';
+    fputcsv($output, ['Employee ID', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Joining Date', 'Employment Type', 'Status', 'Work Location', 'Leaves Taken (Month)', 'Present Days (Month)']);
 
-    $stmt = $db->query("SELECT e.employee_code, e.full_name, e.email, e.phone, d.name as dept_name, des.title as desig_title,
-                        e.date_of_joining, e.employment_type, e.employment_status, e.work_location
+    $stmt = $db->query("SELECT e.id, e.employee_code, e.full_name, e.email, e.phone, d.name as dept_name, des.title as desig_title,
+                        e.date_of_joining, e.employment_type, e.employment_status, e.work_location,
+                        (SELECT COALESCE(SUM(lr.total_days), 0) FROM leave_requests lr WHERE lr.employee_id = e.id AND lr.status = 'Approved' AND (lr.start_date LIKE '{$month}%' OR lr.end_date LIKE '{$month}%')) as month_leaves,
+                        (SELECT COUNT(*) FROM attendance a WHERE a.employee_id = e.id AND a.attendance_date LIKE '{$month}%' AND (a.status = 'Present' OR a.section_1 = 'P' OR a.section_2 = 'P')) as month_presents
                         FROM employees e
                         LEFT JOIN departments d ON e.department_id = d.id
                         LEFT JOIN designations des ON e.designation_id = des.id
@@ -43,11 +46,13 @@ if ($type === 'employees') {
             $row['date_of_joining'],
             $row['employment_type'],
             $row['employment_status'],
-            $row['work_location']
+            $row['work_location'],
+            $row['month_leaves'] ?: '0',
+            $row['month_presents'] ?: '0'
         ]);
     }
 
-} elseif ($type === 'attendance') {
+} elseif ($type === 'attendance' || $type === 'monthly_attendance') {
     // Export Attendance Summary
     $month = $_GET['month'] ?? date('Y-m');
     fputcsv($output, ['Employee ID', 'Full Name', 'Department', 'Date', 'Section 1 (Morning)', 'Section 2 (Afternoon)', 'Status', 'Total Hours', 'Notes / Audit']);
@@ -74,19 +79,25 @@ if ($type === 'employees') {
         ]);
     }
 
-} elseif ($type === 'leaves') {
+} elseif ($type === 'leaves' || $type === 'monthly_leaves') {
     // Export Leave Requests
+    $month = $_GET['month'] ?? '';
     fputcsv($output, ['Employee ID', 'Full Name', 'Department', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Reviewed By', 'Manager Comment', 'Applied At']);
 
-    $stmt = $db->query("SELECT e.employee_code, e.full_name, d.name as dept_name, lt.name as leave_type_name,
-                        lr.start_date, lr.end_date, lr.total_days, lr.status, lr.reason, u.full_name as reviewer_name,
-                        lr.manager_comment, lr.created_at
-                        FROM leave_requests lr
-                        JOIN employees e ON lr.employee_id = e.id
-                        JOIN leave_types lt ON lr.leave_type_id = lt.id
-                        LEFT JOIN departments d ON e.department_id = d.id
-                        LEFT JOIN users u ON lr.reviewed_by = u.id
-                        ORDER BY lr.id DESC");
+    $sql = "SELECT e.employee_code, e.full_name, d.name as dept_name, lt.name as leave_type_name,
+                   lr.start_date, lr.end_date, lr.total_days, lr.status, lr.reason, u.full_name as reviewer_name,
+                   lr.manager_comment, lr.created_at
+            FROM leave_requests lr
+            JOIN employees e ON lr.employee_id = e.id
+            JOIN leave_types lt ON lr.leave_type_id = lt.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN users u ON lr.reviewed_by = u.id";
+    if (!empty($month)) {
+        $sql .= " WHERE (lr.start_date LIKE '{$month}%' OR lr.end_date LIKE '{$month}%' OR lr.created_at LIKE '{$month}%')";
+    }
+    $sql .= " ORDER BY lr.start_date DESC";
+
+    $stmt = $db->query($sql);
 
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         fputcsv($output, [

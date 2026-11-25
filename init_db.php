@@ -420,6 +420,59 @@ $db->exec("CREATE TABLE chat_messages (
     FOREIGN KEY(sender_id) REFERENCES users(id) ON DELETE CASCADE
 )");
 
+$db->exec("CREATE TABLE IF NOT EXISTS client_monthly_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    month VARCHAR(10) NOT NULL,
+    title VARCHAR(200) DEFAULT 'Monthly Strategy & Deliverables Plan',
+    columns_json TEXT,
+    rows_json TEXT,
+    budget DECIMAL(12, 2) DEFAULT 0,
+    paid_amount DECIMAL(12, 2) DEFAULT 0,
+    platform_allocations_json TEXT DEFAULT NULL,
+    status VARCHAR(50) DEFAULT 'Active',
+    notes TEXT,
+    created_by INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(client_id, month)
+)");
+
+$db->exec("CREATE TABLE IF NOT EXISTS project_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    client_id INTEGER NOT NULL,
+    service_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    assignees_json TEXT DEFAULT '[]',
+    status VARCHAR(50) DEFAULT 'Active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)");
+
+$db->exec("CREATE TABLE IF NOT EXISTS daily_worklogs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    log_date DATE NOT NULL,
+    project_id INTEGER DEFAULT NULL,
+    task_id INTEGER DEFAULT NULL,
+    work_type VARCHAR(50) DEFAULT 'General',
+    hours_spent DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    reason TEXT,
+    challenges TEXT,
+    work_link VARCHAR(255) DEFAULT NULL,
+    status VARCHAR(50) DEFAULT 'Completed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE SET NULL
+)");
+$db->exec("CREATE INDEX IF NOT EXISTS idx_worklogs_user_date ON daily_worklogs(user_id, log_date)");
+$db->exec("CREATE INDEX IF NOT EXISTS idx_worklogs_date ON daily_worklogs(log_date)");
+
 // Seed Roles
 $roles = [
     ['Super Admin', 'Full system access to all modules'],
@@ -439,7 +492,7 @@ foreach ($roles as $r) {
 $modules = [
     ['sales', 'Sales & CRM', 'Manage leads, follow-ups, and sales conversions'],
     ['client-management', 'Client Management', 'Manage client accounts, contracts, and onboarding'],
-    ['template-generator', 'Template Generator', 'Generate proposals, quotes, contracts, and invoices'],
+    ['template-generator', 'Proposal', 'Generate proposals, quotes, contracts, and invoices'],
     ['task-management', 'Project & Task Management', 'Team Lead assignment, developer work, reviews, and SLAs'],
     ['reports', 'Reports & Analytics', 'Management metrics, revenue, and productivity dashboard'],
     ['client_dashboard', 'Client Dashboard', 'Restricted Client Portal view']

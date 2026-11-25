@@ -1058,10 +1058,27 @@ function renderCompetitors() {
 function renderProjectTasks() {
     const tbody = document.getElementById('pdTasksTbody');
     const filter = document.getElementById('pdTaskStatusFilter')?.value || '';
-    let filtered = pdTasks;
+    let filtered = pdTasks || [];
     if (filter) {
         filtered = pdTasks.filter(t => t.status === filter);
     }
+
+    // Sort tasks: IN PROGRESS shown first base, then active review/pending, COMPLETED last
+    const pdStatusRank = {
+        'IN PROGRESS': 1,
+        'UNDER REVIEW': 2,
+        'PENDING LEAD APPROVAL': 3,
+        'SENT FOR CLIENT APPROVAL': 4,
+        'REVISION REQUIRED': 5,
+        'PENDING': 6,
+        'COMPLETED': 7
+    };
+    filtered.sort((a, b) => {
+        const rA = pdStatusRank[(a.status || '').toUpperCase().trim()] || 8;
+        const rB = pdStatusRank[(b.status || '').toUpperCase().trim()] || 8;
+        if (rA !== rB) return rA - rB;
+        return (b.id || 0) - (a.id || 0);
+    });
 
     if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:32px; color:#94a3b8;">No tasks found on this project yet. ${pdCanManage ? 'Click "+ Create Task on Project" above to create one!' : ''}</td></tr>`;
@@ -1099,10 +1116,10 @@ function renderProjectTasks() {
                     <option value="PENDING" ${t.status === 'PENDING' ? 'selected' : ''}>⏳ Pending</option>
                     <option value="IN PROGRESS" ${t.status === 'IN PROGRESS' ? 'selected' : ''}>⚡ In Progress</option>
                     <option value="UNDER REVIEW" ${t.status === 'UNDER REVIEW' ? 'selected' : ''}>🔍 Under Review</option>
-                    ${t.status === 'PENDING LEAD APPROVAL' ? '<option value="PENDING LEAD APPROVAL" selected disabled>📝 Pending Lead Approval</option>' : ''}
+                    ${t.status === 'PENDING LEAD APPROVAL' ? '<option value="PENDING LEAD APPROVAL" selected>📝 Pending Lead Approval</option>' : ''}
                     ${t.status === 'REVISION REQUIRED' ? '<option value="REVISION REQUIRED" selected>🔄 Revision Needed</option>' : ''}
-                    ${t.status === 'SENT FOR CLIENT APPROVAL' ? '<option value="SENT FOR CLIENT APPROVAL" selected disabled>📩 Client Approval</option>' : ''}
-                    ${t.status === 'COMPLETED' ? '<option value="COMPLETED" selected disabled>✅ Completed</option>' : ''}
+                    ${t.status === 'SENT FOR CLIENT APPROVAL' ? '<option value="SENT FOR CLIENT APPROVAL" selected>📩 Client Approval</option>' : ''}
+                    <option value="COMPLETED" ${t.status === 'COMPLETED' ? 'selected' : ''}>✅ Completed</option>
                 </select>
             `;
         }
@@ -1177,6 +1194,9 @@ function updatePdTaskStatus(taskId, newStatus) {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            if (data.project_completed) {
+                alert('🎉 ' + data.message);
+            }
             loadProjectDetails();
         } else {
             alert('Error: ' + data.message);
@@ -1305,6 +1325,12 @@ function openPdReviewModal(taskId, title, remarks) {
 }
 
 function submitPdHandlerReview() {
+    const btn = document.querySelector('#pdReviewModal button[type="submit"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Processing...';
+    }
+
     fetch('api.php?action=review_task_work', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1312,18 +1338,30 @@ function submitPdHandlerReview() {
             task_id: document.getElementById('pd_rw_task_id').value,
             review_action: document.getElementById('pd_rw_action').value,
             review_comment: document.getElementById('pd_rw_comment').value,
-            required_changes: document.getElementById('pd_rw_changes').value
+            required_changes: document.getElementById('pd_rw_changes') ? document.getElementById('pd_rw_changes').value : ''
         })
     })
     .then(res => res.json())
     .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Confirm Handler Decision';
+        }
         if (data.success) {
             closePdModal('pdReviewModal');
             alert('✅ ' + data.message);
             loadProjectDetails();
         } else {
-            alert('Error: ' + data.message);
+            alert('Error: ' + (data.message || 'Approval failed.'));
         }
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Confirm Handler Decision';
+        }
+        console.error('Handler review error:', err);
+        alert('Network or server error submitting handler decision: ' + err.message);
     });
 }
 

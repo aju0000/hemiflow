@@ -340,7 +340,7 @@ function checkAuth($requiredModule = null) {
                 $modLinks = [
                     'sales' => ['Sales & CRM', 'index.php'],
                     'client-management' => ['Client Management', 'clients.php'],
-                    'template-generator' => ['Template Generator', 'template_generator.php'],
+                    'template-generator' => ['Proposal', 'template_generator.php'],
                     'task-management' => ['Task Management', 'projects.php'],
                     'reports' => ['Reports & BI', 'reports.php']
                 ];

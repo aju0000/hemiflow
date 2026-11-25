@@ -8,9 +8,9 @@ $user = getCurrentUser();
 $db = getDbConnection();
 $isLead = isLeadOrAdmin();
 
-$pageBreadcrumb = "Module 4 &bull; Scheduling";
-$pageTitle = "Task Calendar & Work Scheduler";
-$pageSubtitle = "Visual task planning, start & end date management, developer assignment, and SLA tracking.";
+$pageBreadcrumb = "";
+$pageTitle = "Task Calendar";
+$pageSubtitle = "View and manage all project tasks, deadlines and schedules.";
 
 // Fetch active developers and staff
 $developers = $db->query("SELECT u.*, r.name as role_name 
@@ -36,140 +36,119 @@ require_once __DIR__ . '/header.php';
 
 <div class="calendar-page-container">
 
-    <!-- ========================================================= -->
-    <!-- BITRIX24 STYLE TOP CONTROL BAR                            -->
-    <!-- ========================================================= -->
-    <div class="calendar-top-bar">
-        <div class="calendar-top-left">
-            <!-- + Create Button -->
-            <?php if ($isLead): ?>
-                <button class="btn-pill-primary" onclick="openCreateCalendarTaskModal()" style="padding: 9px 18px;">
-                    <i data-feather="plus" class="icon-prefix"></i>
-                    <span>+ Create Task</span>
+    <!-- Interactive Calendar Canvas Card matching HemitoERP Reference UI -->
+    <div class="calendar-canvas-card">
+        
+        <!-- Header Toolbar matching Screenshot -->
+        <div class="calendar-card-header">
+            <div class="cal-header-left">
+                <button type="button" class="cal-nav-arrow-btn" onclick="navCalendar('prev')" title="Previous Month">
+                    <i data-feather="chevron-left" style="width:18px; height:18px;"></i>
                 </button>
-            <?php endif; ?>
-
-            <!-- Calendar Mode Switcher (Bitrix24 style: My Calendar vs Company Calendar) -->
-            <div style="position:relative; display:inline-block;">
-                <button type="button" class="calendar-view-dropdown-btn" onclick="toggleCalendarModeMenu(event)" id="calModeBtn">
-                    <i data-feather="calendar" style="width:16px; height:16px; color:#2563eb;"></i>
-                    <span id="calModeLabel"><?= !$isLead ? 'My Calendar' : 'Company Calendar' ?></span>
-                    <i data-feather="chevron-down" style="width:14px; height:14px; color:#64748b;"></i>
+                <button type="button" class="cal-nav-arrow-btn" onclick="navCalendar('next')" title="Next Month">
+                    <i data-feather="chevron-right" style="width:18px; height:18px;"></i>
                 </button>
-
-                <div id="calModeMenu" class="dropdown-menu-premium" style="top:115%; left:0; min-width:210px; display:none;">
-                    <?php if ($isLead): ?>
-                    <a class="dropdown-item" href="javascript:void(0)" onclick="setCalendarMode('company')">
-                        <i data-feather="globe"></i>
-                        <span>Company Calendar (All)</span>
-                    </a>
-                    <?php endif; ?>
-                    <a class="dropdown-item" href="javascript:void(0)" onclick="setCalendarMode('my')">
-                        <i data-feather="user"></i>
-                        <span>My Calendar (Assigned to Me)</span>
-                    </a>
+                <div class="cal-month-heading-wrap" onclick="navCalendar('today')" title="Jump to Today">
+                    <span class="cal-current-month-text" id="calCurrentMonthTitle">November 2026</span>
+                    <i data-feather="chevron-down" style="width:16px; height:16px; color:#64748b;"></i>
                 </div>
             </div>
 
-            <!-- Real-time Search Box -->
-            <div class="cal-search-box">
-                <i data-feather="search" class="cal-search-icon"></i>
-                <input type="text" class="cal-search-input" id="calSearchInput" placeholder="Search tasks, projects, developers..." oninput="debounceFilter()">
+            <div class="cal-header-center">
+                <div class="cal-view-pill-container">
+                    <button type="button" class="cal-view-btn active" data-view="dayGridMonth" onclick="switchCalendarView('dayGridMonth', this)">Month</button>
+                    <button type="button" class="cal-view-btn" data-view="timeGridWeek" onclick="switchCalendarView('timeGridWeek', this)">Week</button>
+                    <button type="button" class="cal-view-btn" data-view="timeGridDay" onclick="switchCalendarView('timeGridDay', this)">Day</button>
+                    <button type="button" class="cal-view-btn" data-view="listMonth" onclick="switchCalendarView('listMonth', this)">List</button>
+                </div>
+            </div>
+
+            <div class="cal-header-right">
+                <!-- Filter Drawer Toggle -->
+                <button type="button" class="cal-filter-toggle-btn" onclick="toggleCalendarFilters()" id="calFilterToggleBtn" title="Filter tasks by project, developer or status">
+                    <i data-feather="sliders" style="width:14px; height:14px;"></i>
+                    <span>Filter</span>
+                </button>
+
+                <!-- + Create Task Button -->
+                <?php if ($isLead): ?>
+                    <button class="cal-create-task-btn" onclick="openCreateCalendarTaskModal()">
+                        <i data-feather="plus" style="width:16px; height:16px;"></i>
+                        <span>Create Task</span>
+                    </button>
+                <?php endif; ?>
             </div>
         </div>
 
-        <div class="calendar-top-right">
-            <!-- Month Title & Navigation -->
-            <div class="cal-nav-group">
-                <button type="button" class="cal-nav-btn" onclick="navCalendar('prev')" title="Previous">
-                    <i data-feather="chevron-left" style="width:18px; height:18px;"></i>
-                </button>
-                <button type="button" class="cal-today-btn" onclick="navCalendar('today')">
-                    Today
-                </button>
-                <button type="button" class="cal-nav-btn" onclick="navCalendar('next')" title="Next">
-                    <i data-feather="chevron-right" style="width:18px; height:18px;"></i>
-                </button>
-                <span class="cal-current-title" id="calCurrentMonthTitle">October, 2026</span>
-            </div>
+        <!-- Collapsible Filter Drawer -->
+        <div id="calFilterDrawer" class="cal-filter-drawer" style="display:none;">
+            <div class="cal-drawer-inner">
+                <div class="cal-search-box" style="flex:1; min-width:200px;">
+                    <i data-feather="search" class="cal-search-icon"></i>
+                    <input type="text" class="cal-search-input" id="calSearchInput" placeholder="Search tasks, projects, developers..." oninput="debounceFilter()">
+                </div>
 
-            <!-- View Switcher (Day, Week, Month, List) -->
-            <div class="cal-view-pills">
-                <button type="button" class="cal-view-pill-btn" data-view="timeGridDay" onclick="switchCalendarView('timeGridDay', this)">Day</button>
-                <button type="button" class="cal-view-pill-btn" data-view="timeGridWeek" onclick="switchCalendarView('timeGridWeek', this)">Week</button>
-                <button type="button" class="cal-view-pill-btn active" data-view="dayGridMonth" onclick="switchCalendarView('dayGridMonth', this)">Month</button>
-                <button type="button" class="cal-view-pill-btn" data-view="listMonth" onclick="switchCalendarView('listMonth', this)">List</button>
-            </div>
+                <select id="calFilterProject" class="form-select" style="font-size:12.5px; width:170px;" onchange="reloadCalendarEvents()">
+                    <option value="0">All Projects</option>
+                    <?php foreach ($projects as $p): ?>
+                        <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['project_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
 
-            <!-- Link to Kanban Table View in projects.php -->
-            <a href="projects.php" class="btn btn-outline btn-sm" style="font-weight:700; border-radius:10px; padding:7px 14px; text-decoration:none;" title="Switch to Kanban Board View">
-                <i data-feather="trello" style="width:15px; height:15px;"></i> Kanban
-            </a>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- SECONDARY FILTER & LEGEND BAR                             -->
-    <!-- ========================================================= -->
-    <div class="calendar-filter-bar">
-        <div class="calendar-filters-left">
-            <!-- Project Filter -->
-            <select id="calFilterProject" class="form-select" style="font-size:12.5px; width:190px;" onchange="reloadCalendarEvents()">
-                <option value="0">All Projects</option>
-                <?php foreach ($projects as $p): ?>
-                    <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['project_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <!-- Developer Filter (If Admin/Lead) -->
-            <?php if ($isLead): ?>
-                <select id="calFilterDeveloper" class="form-select" style="font-size:12.5px; width:170px;" onchange="reloadCalendarEvents()">
+                <?php if ($isLead): ?>
+                <select id="calFilterDeveloper" class="form-select" style="font-size:12.5px; width:160px;" onchange="reloadCalendarEvents()">
                     <option value="0">All Developers</option>
                     <?php foreach ($developers as $d): ?>
                         <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['full_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-            <?php endif; ?>
+                <?php endif; ?>
 
-            <!-- Status Filter -->
-            <select id="calFilterStatus" class="form-select" style="font-size:12.5px; width:160px;" onchange="reloadCalendarEvents()">
-                <option value="">All Statuses</option>
-                <option value="PENDING">Pending</option>
-                <option value="IN PROGRESS">In Progress</option>
-                <option value="UNDER REVIEW">Under Review</option>
-                <option value="REVISION REQUIRED">Revision Needed</option>
-                <option value="COMPLETED">Completed</option>
-            </select>
+                <select id="calFilterStatus" class="form-select" style="font-size:12.5px; width:140px;" onchange="reloadCalendarEvents()">
+                    <option value="">All Statuses</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="IN PROGRESS">In Progress</option>
+                    <option value="UNDER REVIEW">Under Review</option>
+                    <option value="REVISION REQUIRED">Revision Needed</option>
+                    <option value="COMPLETED">Completed</option>
+                </select>
 
-            <!-- Priority Filter -->
-            <select id="calFilterPriority" class="form-select" style="font-size:12.5px; width:140px;" onchange="reloadCalendarEvents()">
-                <option value="">All Priorities</option>
-                <option value="Urgent">Urgent</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-            </select>
+                <select id="calFilterPriority" class="form-select" style="font-size:12.5px; width:130px;" onchange="reloadCalendarEvents()">
+                    <option value="">All Priorities</option>
+                    <option value="Urgent">Urgent</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
 
-            <button type="button" class="btn btn-outline btn-sm" onclick="reloadCalendarEvents()" title="Refresh Calendar">
-                <i data-feather="refresh-cw" style="width:14px; height:14px;"></i>
-            </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="resetCalendarFilters()" title="Reset Filters">
+                    <i data-feather="rotate-ccw" style="width:13px; height:13px;"></i>
+                </button>
+            </div>
         </div>
 
-        <!-- Visual Status Legend -->
-        <div class="calendar-legend-bar">
-            <span class="legend-item"><span class="legend-dot" style="background:#2563eb;"></span> In Progress</span>
-            <span class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Completed</span>
-            <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Under Review</span>
-            <span class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> Revision Needed</span>
-            <span class="legend-item"><span class="legend-dot" style="background:#64748b;"></span> Pending</span>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- INTERACTIVE CALENDAR CANVAS CARD                          -->
-    <!-- ========================================================= -->
-    <div class="calendar-canvas-card">
+        <!-- FullCalendar Canvas -->
         <div id="calendarEl"></div>
+
+        <!-- Legend Footer -->
+        <div class="cal-legend-footer">
+            <div class="cal-legend-item">
+                <span class="cal-legend-pill-dot" style="background: linear-gradient(135deg, #4f46e5, #6366f1);"></span>
+                <span>In Progress / Active</span>
+            </div>
+            <div class="cal-legend-item">
+                <span class="cal-legend-pill-dot" style="background: linear-gradient(135deg, #f43f5e, #fb7185);"></span>
+                <span>Urgent / High Priority</span>
+            </div>
+            <div class="cal-legend-item">
+                <span class="cal-legend-pill-dot" style="background: linear-gradient(135deg, #10b981, #34d399);"></span>
+                <span>Completed</span>
+            </div>
+            <div class="cal-legend-item">
+                <span class="cal-legend-pill-dot" style="background: linear-gradient(135deg, #f59e0b, #fbbf24);"></span>
+                <span>Under Review</span>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -452,12 +431,14 @@ require_once __DIR__ . '/header.php';
                 openEditCalendarTask(info.event);
             },
 
-            // 5. CUSTOM EVENT RENDERING (Bitrix24 Pill Design)
+            // 5. CUSTOM EVENT RENDERING (Pill Design matching reference)
             eventContent: function(arg) {
                 const props = arg.event.extendedProps || {};
                 const taskCode = props.task_code || '';
                 const rawTitle = props.raw_title || arg.event.title;
-                const assigneeName = props.assigned_to_name || '';
+                const assigneeName = (props.assigned_to_name && props.assigned_to_name !== 'Unassigned')
+                    ? props.assigned_to_name.split(' ')[0]
+                    : (props.department ? props.department.split(' ')[0] : 'Staff');
 
                 const customEl = document.createElement('div');
                 customEl.className = 'cal-event-pill';
@@ -465,9 +446,28 @@ require_once __DIR__ . '/header.php';
                     <span class="cal-event-dot"></span>
                     ${taskCode ? `<span class="cal-event-code">${escapeHtml(taskCode)}</span>` : ''}
                     <span class="cal-event-title">${escapeHtml(rawTitle)}</span>
-                    ${assigneeName ? `<span class="cal-event-assignee">${escapeHtml(assigneeName.split(' ')[0])}</span>` : ''}
+                    ${assigneeName ? `<span class="cal-event-assignee">${escapeHtml(assigneeName)}</span>` : ''}
                 `;
                 return { domNodes: [customEl] };
+            },
+
+            eventDidMount: function(info) {
+                const props = info.event.extendedProps || {};
+                const priority = (props.priority || '').toLowerCase();
+                const status = (props.status || '').toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+                if (priority === 'urgent' || priority === 'high' || status.includes('revision')) {
+                    info.el.style.setProperty('background', 'linear-gradient(135deg, #f43f5e 0%, #fb7185 100%)', 'important');
+                    info.el.classList.add('cal-event-urgent');
+                } else if (status === 'completed') {
+                    info.el.style.setProperty('background', 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', 'important');
+                    info.el.classList.add('cal-event-completed');
+                } else if (status === 'under-review') {
+                    info.el.style.setProperty('background', 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', 'important');
+                    info.el.classList.add('cal-event-review');
+                } else {
+                    info.el.style.setProperty('background', 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)', 'important');
+                }
             },
 
             // 6. DYNAMIC EVENT FEED FROM API
@@ -580,15 +580,43 @@ require_once __DIR__ . '/header.php';
         if (!calendarInstance) return;
         calendarInstance.changeView(viewName);
 
-        document.querySelectorAll('.cal-view-pill-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.cal-view-btn, .cal-view-pill-btn').forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
     }
 
     function updateMonthTitle(title) {
         const titleEl = document.getElementById('calCurrentMonthTitle');
         if (titleEl) {
-            titleEl.textContent = title;
+            titleEl.textContent = title ? title.replace(',', '') : '';
         }
+    }
+
+    function toggleCalendarFilters() {
+        const drawer = document.getElementById('calFilterDrawer');
+        const btn = document.getElementById('calFilterToggleBtn');
+        if (!drawer) return;
+        if (drawer.style.display === 'none' || drawer.style.display === '') {
+            drawer.style.display = 'block';
+            if (btn) btn.classList.add('active');
+        } else {
+            drawer.style.display = 'none';
+            if (btn) btn.classList.remove('active');
+        }
+        if (window.feather) feather.replace();
+    }
+
+    function resetCalendarFilters() {
+        const searchInput = document.getElementById('calSearchInput');
+        if (searchInput) searchInput.value = '';
+        const proj = document.getElementById('calFilterProject');
+        if (proj) proj.value = '0';
+        const dev = document.getElementById('calFilterDeveloper');
+        if (dev) dev.value = '0';
+        const status = document.getElementById('calFilterStatus');
+        if (status) status.value = '';
+        const prio = document.getElementById('calFilterPriority');
+        if (prio) prio.value = '';
+        reloadCalendarEvents();
     }
 
     function reloadCalendarEvents() {

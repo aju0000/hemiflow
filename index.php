@@ -892,7 +892,7 @@ try {
         <div>
             <?php if (hasModuleAccess('template-generator')): ?>
                 <a href="template_generator.php" class="btn btn-primary">
-                    <i data-feather="plus"></i> Open Template Generator
+                    <i data-feather="plus"></i> Open Proposal
                 </a>
             <?php elseif (hasModuleAccess('client-management')): ?>
                 <a href="clients.php" class="btn btn-primary">
@@ -1139,12 +1139,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div style="background:#dbeafe; color:#2563eb; padding:8px; border-radius:6px;">
                     <i data-feather="file-text"></i>
                 </div>
-                <h4 style="margin:0; font-size:16px;">Module 3 — Template Generator</h4>
+                <h4 style="margin:0; font-size:16px;">Module 3 — Proposal</h4>
             </div>
             <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px; line-height:1.5;">
                 Generate proposals, invoices, contracts, MOMs, and service agreements from client data. Export to PDF/Word & handover to Dev team.
             </p>
-            <a href="template_generator.php" class="btn btn-primary btn-sm">Launch Module 3</a>
+            <a href="template_generator.php" class="btn btn-primary btn-sm">Launch Proposal</a>
         </div>
         <?php endif; ?>
 

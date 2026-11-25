@@ -290,77 +290,560 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Scoped modern styling for HR & Workforce Management */
+.cm-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 22px;
+}
+@media (max-width: 1100px) {
+    .cm-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .cm-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cm-kpi-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.025);
+    border: 1px solid #f1f5f9;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 120px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cm-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+}
+.cm-kpi-card::after {
+    content: "";
+    position: absolute;
+    right: -25px;
+    bottom: -25px;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0.9;
+}
+.cm-card-purple::after {
+    background: radial-gradient(circle, rgba(243, 232, 255, 0.85) 0%, rgba(250, 245, 255, 0) 70%);
+}
+.cm-card-green::after {
+    background: radial-gradient(circle, rgba(236, 253, 245, 0.85) 0%, rgba(240, 253, 250, 0) 70%);
+}
+.cm-card-orange::after {
+    background: radial-gradient(circle, rgba(255, 247, 237, 0.9) 0%, rgba(255, 251, 235, 0) 70%);
+}
+.cm-card-blue::after {
+    background: radial-gradient(circle, rgba(239, 246, 255, 0.85) 0%, rgba(248, 250, 252, 0) 70%);
+}
+.cm-card-red::after {
+    background: radial-gradient(circle, rgba(254, 242, 242, 0.85) 0%, rgba(254, 226, 226, 0) 70%);
+}
+
+.cm-kpi-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.cm-kpi-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.cm-icon-purple {
+    background: #f5f3ff;
+    color: #7c3aed;
+}
+.cm-icon-green {
+    background: #ecfdf5;
+    color: #10b981;
+}
+.cm-icon-orange {
+    background: #fff7ed;
+    color: #f97316;
+}
+.cm-icon-blue {
+    background: #eff6ff;
+    color: #0284c7;
+}
+.cm-icon-red {
+    background: #fef2f2;
+    color: #ef4444;
+}
+.cm-kpi-icon-box svg {
+    width: 18px;
+    height: 18px;
+}
+.cm-kpi-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.cm-kpi-bottom {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 14px;
+}
+.cm-kpi-number {
+    font-size: 30px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
+    letter-spacing: -0.5px;
+}
+.cm-trend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Action Buttons Row */
+.cm-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.cm-bar-left, .cm-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cm-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%);
+    color: #ffffff !important;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(91, 33, 182, 0.28);
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+.cm-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(91, 33, 182, 0.38);
+    color: #ffffff !important;
+}
+.cm-btn-pill-white {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    color: #1e293b !important;
+    border: 1px solid #e2e8f0;
+    padding: 9px 20px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+.cm-btn-pill-white:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+.cm-btn-pill-white svg, .cm-btn-primary svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Modern Pill Navigation Tabs */
+.hr-pill-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 999px;
+    padding: 6px 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    margin-bottom: 22px;
+}
+.hr-tab-btn {
+    border: none !important;
+    border-radius: 999px !important;
+    padding: 8px 18px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #64748b !important;
+    background: transparent !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    cursor: pointer !important;
+    transition: all 0.18s ease !important;
+    outline: none !important;
+    text-decoration: none !important;
+    line-height: 1;
+}
+.hr-tab-btn:hover {
+    color: #0f172a !important;
+    background: #f8fafc !important;
+}
+.hr-tab-btn.active {
+    background: linear-gradient(135deg, #5b21b6, #6d28d9) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(91, 33, 182, 0.28) !important;
+}
+.hr-tab-btn.active svg {
+    stroke: #ffffff !important;
+}
+
+/* Modern Personal Leave Banner */
+.hr-personal-leave-banner {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    border-radius: 20px;
+    padding: 20px 24px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 24px;
+    color: #ffffff;
+}
+
+/* Filter & Search Bar */
+.cm-filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.cm-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 260px;
+}
+.cm-search-wrapper svg {
+    width: 17px;
+    height: 17px;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+.cm-search-input {
+    border: none;
+    outline: none;
+    font-size: 13.5px;
+    color: #1e293b;
+    width: 100%;
+    background: transparent;
+}
+.cm-search-input::placeholder {
+    color: #94a3b8;
+}
+.cm-filter-dropdowns {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.cm-filter-select {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.cm-filter-select:hover, .cm-filter-select:focus {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+/* Table Card */
+.cm-table-card {
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #f1f5f9;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.025);
+    overflow: hidden;
+}
+.cm-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+.cm-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.cm-table th {
+    background: #ffffff;
+    color: #64748b;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 16px 20px;
+    text-align: left;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+}
+.cm-table td {
+    padding: 16px 20px;
+    border-bottom: 1px solid #f8fafc;
+    vertical-align: middle;
+    font-size: 13.5px;
+    color: #334155;
+}
+.cm-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+.cm-table tbody tr:hover {
+    background: #fafafa;
+}
+.cm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Avatar circle */
+.cm-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: -0.2px;
+}
+.cm-client-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 210px;
+}
+.cm-client-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cm-company-link {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+.cm-company-link:hover {
+    color: #6d28d9;
+}
+.cm-contact-sub {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* Meta info */
+.cm-meta-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12.5px;
+    min-width: 180px;
+}
+.cm-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #334155;
+    white-space: nowrap;
+}
+.cm-meta-line svg {
+    width: 13px;
+    height: 13px;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+/* Portal Account Badge */
+.cm-portal-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: #ede9fe;
+    color: #6d28d9;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Status Pill */
+.cm-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.cm-status-pill.cm-status-active {
+    background: #ecfdf5;
+    color: #059669;
+}
+.cm-status-pill.cm-status-pending {
+    background: #fffbeb;
+    color: #d97706;
+}
+.cm-status-pill.cm-status-suspended {
+    background: #fef2f2;
+    color: #dc2626;
+}
+.cm-status-dot {
+    font-size: 10px;
+    line-height: 1;
+}
+
+/* Action icons */
+.cm-action-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    padding: 0;
+}
+.cm-action-icon-btn:hover {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+.cm-action-icon-btn svg {
+    width: 15px;
+    height: 15px;
+}
 </style>
 
 <!-- Action Pills Navigation Bar -->
-<div class="action-pills-row">
-    <!-- Interactive Mark Attendance Pill Widget -->
-    <button id="markAttPillBtn" class="btn-pill-primary" onclick="openMarkAttendanceModal()" style="display:flex; align-items:center; gap:8px;">
-        <i data-feather="calendar" class="icon-prefix"></i>
-        <span id="markAttPillText">+ Mark Attendance</span>
-        <span id="todayAttStatusBadge" style="display:none; font-size:11px; padding:2px 8px; border-radius:12px; background:rgba(255,255,255,0.22); font-weight:700;"></span>
-    </button>
-
-    <button class="btn-pill-white" onclick="openApplyLeaveModal()">
-        <i data-feather="calendar" class="icon-tag"></i>
-        <span>+ Apply Leave</span>
-    </button>
-
-    <?php if ($isHr): ?>
-        <button class="btn-pill-white" onclick="openEmployeeModal()">
-            <i data-feather="user-plus" class="icon-folder"></i>
-            <span>+ Add Employee</span>
+<div class="cm-action-bar">
+    <div class="cm-bar-left">
+        <!-- Interactive Mark Attendance Pill Widget -->
+        <button id="markAttPillBtn" class="cm-btn-primary" onclick="openMarkAttendanceModal()">
+            <i data-feather="calendar"></i>
+            <span id="markAttPillText">+ Mark Attendance</span>
+            <span id="todayAttStatusBadge" style="display:none; font-size:11px; padding:2px 8px; border-radius:12px; background:rgba(255,255,255,0.25); font-weight:700;"></span>
         </button>
 
-        <button class="btn-pill-white" onclick="switchHrTab('attendance')">
-            <i data-feather="calendar" class="icon-clock"></i>
-            <span>Attendance Calendar</span>
+        <button type="button" class="cm-btn-pill-white" onclick="openApplyLeaveModal()">
+            <i data-feather="calendar"></i>
+            <span>+ Apply Leave</span>
         </button>
 
-        <a href="hr_export.php?type=employees" class="btn-pill-white" style="text-decoration:none;">
-            <i data-feather="download" class="icon-edit"></i>
-            <span>Export Employees CSV</span>
-        </a>
-    <?php endif; ?>
-
-    <button class="btn-pill-white" onclick="refreshCurrentTab()">
-        <i data-feather="refresh-cw" class="icon-edit"></i>
-        <span>Refresh</span>
-    </button>
-</div>
-
-<!-- Tab Navigation Header -->
-<div class="card" style="padding: 12px 20px; margin-bottom: 20px;">
-    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button id="hrTab_dashboard" class="btn btn-outline" style="border:none; border-bottom:3px solid #2563eb; border-radius:0; font-weight:700; color:#2563eb;" onclick="switchHrTab('dashboard')">
-            <i data-feather="grid" style="width:14px; height:14px; margin-right:4px;"></i> Dashboard
-        </button>
-        <button id="hrTab_employees" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('employees')">
-            <i data-feather="users" style="width:14px; height:14px; margin-right:4px;"></i> Employee Directory
-        </button>
-        <button id="hrTab_attendance" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('attendance')">
-            <i data-feather="calendar" style="width:14px; height:14px; margin-right:4px;"></i> Attendance Calendar
-        </button>
-        <button id="hrTab_leaves" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('leaves')">
-            <i data-feather="calendar" style="width:14px; height:14px; margin-right:4px;"></i> Leaves & Balances
-        </button>
         <?php if ($isHr): ?>
-            <button id="hrTab_departments" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('departments')">
-                <i data-feather="briefcase" style="width:14px; height:14px; margin-right:4px;"></i> Dept & Designations
+            <button type="button" class="cm-btn-pill-white" onclick="openEmployeeModal()">
+                <i data-feather="user-plus"></i>
+                <span>+ Add Employee</span>
             </button>
-        <?php endif; ?>
-        <button id="hrTab_holidays" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('holidays')">
-            <i data-feather="flag" style="width:14px; height:14px; margin-right:4px;"></i> Holiday Calendar
-        </button>
-        <button id="hrTab_documents" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('documents')">
-            <i data-feather="folder" style="width:14px; height:14px; margin-right:4px;"></i> Employee Documents
-        </button>
-        <?php if ($isHr || $isLead): ?>
-            <button id="hrTab_reports" class="btn btn-outline" style="border:none; border-bottom:3px solid transparent; border-radius:0; color:#64748b;" onclick="switchHrTab('reports')">
-                <i data-feather="bar-chart-2" style="width:14px; height:14px; margin-right:4px;"></i> HR Reports
+
+            <button type="button" class="cm-btn-pill-white" onclick="switchHrTab('attendance')">
+                <i data-feather="clock"></i>
+                <span>Attendance Calendar</span>
             </button>
         <?php endif; ?>
     </div>
+    <div class="cm-bar-right">
+        <?php if ($isHr): ?>
+            <a href="hr_export.php?type=employees" class="cm-btn-pill-white">
+                <i data-feather="download"></i>
+                <span>Export Employees CSV</span>
+            </a>
+        <?php endif; ?>
+
+        <button type="button" class="cm-btn-pill-white" onclick="refreshCurrentTab()">
+            <i data-feather="refresh-cw"></i>
+            <span>Refresh</span>
+        </button>
+    </div>
+</div>
+
+<!-- Modern Tab Navigation Header -->
+<div class="hr-pill-tabs">
+    <button id="hrTab_dashboard" class="hr-tab-btn active" onclick="switchHrTab('dashboard')">
+        <i data-feather="grid"></i> Dashboard
+    </button>
+    <button id="hrTab_employees" class="hr-tab-btn" onclick="switchHrTab('employees')">
+        <i data-feather="users"></i> Employee Directory
+    </button>
+    <button id="hrTab_attendance" class="hr-tab-btn" onclick="switchHrTab('attendance')">
+        <i data-feather="calendar"></i> Attendance Calendar
+    </button>
+    <button id="hrTab_leaves" class="hr-tab-btn" onclick="switchHrTab('leaves')">
+        <i data-feather="calendar"></i> Leaves &amp; Balances
+    </button>
+    <?php if ($isHr): ?>
+        <button id="hrTab_departments" class="hr-tab-btn" onclick="switchHrTab('departments')">
+            <i data-feather="briefcase"></i> Dept &amp; Designations
+        </button>
+    <?php endif; ?>
+    <button id="hrTab_holidays" class="hr-tab-btn" onclick="switchHrTab('holidays')">
+        <i data-feather="flag"></i> Holiday Calendar
+    </button>
+    <button id="hrTab_documents" class="hr-tab-btn" onclick="switchHrTab('documents')">
+        <i data-feather="folder"></i> Employee Documents
+    </button>
+    <?php if ($isHr || $isLead): ?>
+        <button id="hrTab_reports" class="hr-tab-btn" onclick="switchHrTab('reports')">
+            <i data-feather="bar-chart-2"></i> HR Reports
+        </button>
+    <?php endif; ?>
 </div>
 
 <!-- ==================================================================== -->
@@ -368,38 +851,75 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- ==================================================================== -->
 <div id="tabView_dashboard">
     <!-- Live KPI Stat Cards Row -->
-    <div class="grid-4" style="margin-bottom: 24px;">
-        <div class="card" style="margin-bottom:0;">
-            <p style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Workforce</p>
-            <h2 id="kpi_total_employees" style="font-size:26px; font-weight:800; color:#2563eb; margin-top:4px;">--</h2>
-            <small id="kpi_active_sub" style="color:#64748b; font-size:12px;">Active Employees: --</small>
+    <div class="cm-kpi-grid">
+        <!-- Card 1: Total Workforce -->
+        <div class="cm-kpi-card cm-card-purple">
+            <div class="cm-kpi-top">
+                <div class="cm-kpi-icon-box cm-icon-purple">
+                    <i data-feather="users"></i>
+                </div>
+                <span class="cm-kpi-title">Total Workforce</span>
+            </div>
+            <div class="cm-kpi-bottom">
+                <span class="cm-kpi-number" id="kpi_total_employees">--</span>
+                <span class="cm-trend-pill" id="kpi_active_sub" style="background:#f3e8ff; color:#7c3aed;">Active: --</span>
+            </div>
         </div>
 
-        <div class="card" style="margin-bottom:0;">
-            <p style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Present Today</p>
-            <h2 id="kpi_present_today" style="font-size:26px; font-weight:800; color:#16a34a; margin-top:4px;">--</h2>
-            <small id="kpi_present_sub" style="color:#16a34a; font-size:12px;">Clocked in at Office / Remote</small>
+        <!-- Card 2: Present Today -->
+        <div class="cm-kpi-card cm-card-green">
+            <div class="cm-kpi-top">
+                <div class="cm-kpi-icon-box cm-icon-green">
+                    <i data-feather="user-check"></i>
+                </div>
+                <span class="cm-kpi-title">Present Today</span>
+            </div>
+            <div class="cm-kpi-bottom">
+                <span class="cm-kpi-number" id="kpi_present_today">--</span>
+                <span class="cm-trend-pill" id="kpi_present_sub" style="background:#ecfdf5; color:#10b981;">Office &amp; Remote</span>
+            </div>
         </div>
 
-        <div class="card" style="margin-bottom:0;">
-            <p style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">On Leave Today</p>
-            <h2 id="kpi_on_leave_today" style="font-size:26px; font-weight:800; color:#d97706; margin-top:4px;">--</h2>
-            <small style="color:#d97706; font-size:12px;">Approved Time Off</small>
+        <!-- Card 3: On Leave Today -->
+        <div class="cm-kpi-card cm-card-orange">
+            <div class="cm-kpi-top">
+                <div class="cm-kpi-icon-box cm-icon-orange">
+                    <i data-feather="calendar"></i>
+                </div>
+                <span class="cm-kpi-title">On Leave Today</span>
+            </div>
+            <div class="cm-kpi-bottom">
+                <span class="cm-kpi-number" id="kpi_on_leave_today">--</span>
+                <span class="cm-trend-pill" style="background:#fff7ed; color:#ea580c;">Approved Leaves</span>
+            </div>
         </div>
 
-        <div class="card" style="margin-bottom:0;">
-            <p style="font-size:11px; font-weight:700; color:var(--text-muted); text-transform:uppercase;"><?= ($isHr || $isLead) ? 'Pending Leave Approvals' : 'My Pending Leaves' ?></p>
-            <h2 id="kpi_pending_leaves" style="font-size:26px; font-weight:800; color:#dc2626; margin-top:4px;">--</h2>
-            <small style="color:#dc2626; font-size:12px; font-weight:600;"><?= ($isHr || $isLead) ? 'Requires Manager Review' : 'Awaiting Approval' ?></small>
+        <!-- Card 4: Pending Approvals -->
+        <div class="cm-kpi-card cm-card-red">
+            <div class="cm-kpi-top">
+                <div class="cm-kpi-icon-box cm-icon-red">
+                    <i data-feather="clock"></i>
+                </div>
+                <span class="cm-kpi-title"><?= ($isHr || $isLead) ? 'Pending Leave Approvals' : 'My Pending Leaves' ?></span>
+            </div>
+            <div class="cm-kpi-bottom">
+                <span class="cm-kpi-number" id="kpi_pending_leaves" style="color:#ef4444;">--</span>
+                <span class="cm-trend-pill" style="background:#fee2e2; color:#dc2626;"><?= ($isHr || $isLead) ? 'Requires Review' : 'Awaiting' ?></span>
+            </div>
         </div>
     </div>
 
     <!-- Personal Balance Pills Banner for Employees -->
-    <div id="personalLeaveBanner" class="card" style="display:none; background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color:#fff; margin-bottom:24px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-            <div>
-                <h4 style="font-size:15px; font-weight:700; color:#38bdf8;">My Available Leave Balances (<?= date('Y') ?>)</h4>
-                <p style="font-size:12px; color:#94a3b8; margin:2px 0 0 0;">Check your annual entitlements before applying for time off</p>
+    <div id="personalLeaveBanner" class="hr-personal-leave-banner" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:40px; height:40px; border-radius:12px; background:rgba(56, 189, 248, 0.15); display:flex; align-items:center; justify-content:center; color:#38bdf8;">
+                    <i data-feather="award"></i>
+                </div>
+                <div>
+                    <h4 style="font-size:15px; font-weight:800; color:#ffffff; margin:0;">My Available Leave Balances (<?= date('Y') ?>)</h4>
+                    <p style="font-size:12.5px; color:#94a3b8; margin:3px 0 0 0;">Check your annual entitlements before applying for time off</p>
+                </div>
             </div>
             <div id="personalLeavePills" style="display:flex; gap:10px; flex-wrap:wrap;">
                 <!-- Populated via JS -->
@@ -425,34 +945,34 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
             </div>
 
             <!-- Today's Attendance Snapshot Card -->
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
-                    <h3 style="font-size:15px; font-weight:700; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                        <i data-feather="check-circle" style="width:16px; height:16px; color:#10b981;"></i> Today's Attendance Overview
+            <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+                    <h3 style="font-size:16px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                        <i data-feather="check-circle" style="width:18px; height:18px; color:#10b981;"></i> Today's Attendance Overview
                     </h3>
                     <div style="display:flex; gap:8px; align-items:center;">
-                        <span class="badge badge-primary"><?= date('D, M d, Y') ?></span>
-                        <button class="btn btn-outline btn-sm" onclick="switchHrTab('attendance')" style="border-radius:6px; font-size:11px;">
-                            <i data-feather="calendar" style="width:12px; height:12px; margin-right:4px;"></i> Open Calendar
+                        <span class="cm-portal-pill" style="font-size:12px; font-weight:700;"><?= date('D, M d, Y') ?></span>
+                        <button type="button" class="cm-btn-pill-white" onclick="switchHrTab('attendance')" style="padding:5px 14px; font-size:12px;">
+                            <i data-feather="calendar" style="width:13px; height:13px;"></i> Open Calendar
                         </button>
                     </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table">
+                <div class="cm-table-wrapper">
+                    <table class="cm-table">
                         <thead>
                             <tr>
                                 <th>Employee</th>
                                 <th>Department</th>
                                 <th>Live Presence</th>
-                                <th>Section 1 (Morning)</th>
-                                <th>Section 2 (Afternoon)</th>
+                                <th>Section 1</th>
+                                <th>Section 2</th>
                                 <th>Overall Status</th>
                                 <th>Work Hours</th>
                                 <th style="text-align:right;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="dashTodayAttendanceBody">
-                            <tr><td colspan="8" style="text-align:center; padding:20px;">Loading today's attendance...</td></tr>
+                            <tr><td colspan="8" style="text-align:center; padding:25px; color:#64748b;">Loading today's attendance...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -505,48 +1025,51 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- TAB 2: EMPLOYEE DIRECTORY                                            -->
 <!-- ==================================================================== -->
 <div id="tabView_employees" style="display:none;">
-    <div class="card">
-        <!-- Filters Bar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
-            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; flex:1;">
-                <input type="text" id="empSearch" class="form-control" style="max-width:240px;" placeholder="Search name, code, email..." onkeyup="if(event.key==='Enter') loadEmployees();">
-                <select id="empFilterDept" class="form-select" style="max-width:200px;" onchange="loadEmployees()">
-                    <option value="">All Departments</option>
-                    <?php foreach ($departments as $d): ?>
-                        <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <select id="empFilterStatus" class="form-select" style="max-width:160px;" onchange="loadEmployees()">
-                    <option value="">All Statuses</option>
-                    <option value="Active" selected>Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-                <button class="btn btn-outline" onclick="loadEmployees()">Filter</button>
-            </div>
+    <!-- Filter & Search Bar -->
+    <div class="cm-filter-bar">
+        <div class="cm-search-wrapper">
+            <i data-feather="search"></i>
+            <input type="text" id="empSearch" class="cm-search-input" placeholder="Search employee by name, code, email..." oninput="loadEmployees()">
+        </div>
+        <div class="cm-filter-dropdowns">
+            <select id="empFilterDept" class="cm-filter-select" onchange="loadEmployees()">
+                <option value="">All Departments</option>
+                <?php foreach ($departments as $d): ?>
+                    <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select id="empFilterStatus" class="cm-filter-select" onchange="loadEmployees()">
+                <option value="">All Statuses</option>
+                <option value="Active" selected>Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
             <?php if ($isHr): ?>
-                <button class="btn btn-primary" onclick="openEmployeeModal()">
-                    <i data-feather="plus" style="width:14px; height:14px; margin-right:4px;"></i> Add New Employee
+                <button type="button" class="cm-btn-primary" onclick="openEmployeeModal()" style="padding: 8px 18px; font-size: 13px;">
+                    <i data-feather="user-plus" style="width:14px; height:14px;"></i>
+                    <span>+ Add Employee</span>
                 </button>
             <?php endif; ?>
         </div>
+    </div>
 
-        <!-- Employees Table -->
-        <div class="table-responsive">
-            <table class="table">
+    <!-- Employees Table Card -->
+    <div class="cm-table-card">
+        <div class="cm-table-wrapper">
+            <table class="cm-table">
                 <thead>
                     <tr>
                         <th>Employee ID</th>
-                        <th>Full Name</th>
-                        <th>Department & Title</th>
-                        <th>Contact Email & Phone</th>
+                        <th>Employee / Contact</th>
+                        <th>Department &amp; Designation</th>
+                        <th>Contact Email &amp; Phone</th>
                         <th>Joined Date</th>
-                        <th>Employment Type</th>
+                        <th>Type</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="employeesTableBody">
-                    <tr><td colspan="8" style="text-align:center; padding:30px;">Loading employee records...</td></tr>
+                    <tr><td colspan="8" style="text-align:center; padding:35px; color:#64748b;">Loading employee records...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -559,16 +1082,16 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <div id="tabView_attendance" style="display:none;">
     
     <!-- Top Attendance Control Bar Card -->
-    <div class="card" style="margin-bottom: 20px;">
+    <div class="card" style="margin-bottom: 20px; border-radius: 20px; border: 1px solid #f1f5f9; box-shadow: 0 4px 20px rgba(0,0,0,0.025); padding: 14px 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
             
             <!-- Left: View Switcher (Calendar vs Table) -->
-            <div style="display:flex; align-items:center; gap:6px; background:#f1f5f9; padding:4px; border-radius:10px;">
-                <button id="btnAttViewCalendar" class="btn btn-sm btn-primary" onclick="setAttendanceSubView('calendar')" style="border-radius:8px; display:flex; align-items:center; gap:6px;">
+            <div style="display:flex; align-items:center; gap:6px; background:#f8fafc; padding:4px; border-radius:999px; border:1px solid #e2e8f0;">
+                <button id="btnAttViewCalendar" class="cm-btn-primary" onclick="setAttendanceSubView('calendar')" style="padding:6px 16px; font-size:12.5px;">
                     <i data-feather="calendar" style="width:14px; height:14px;"></i>
                     <span>Calendar View</span>
                 </button>
-                <button id="btnAttViewTable" class="btn btn-sm btn-outline" onclick="setAttendanceSubView('table')" style="border-radius:8px; border:none; display:flex; align-items:center; gap:6px; color:#64748b;">
+                <button id="btnAttViewTable" class="cm-btn-pill-white" onclick="setAttendanceSubView('table')" style="border:none; padding:6px 16px; font-size:12.5px; box-shadow:none;">
                     <i data-feather="list" style="width:14px; height:14px;"></i>
                     <span>Table Log</span>
                 </button>
@@ -576,16 +1099,16 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 
             <!-- Center: Month Navigator -->
             <div style="display:flex; align-items:center; gap:8px;">
-                <button class="btn btn-outline btn-sm" onclick="changeAttendanceMonth(-1)" title="Previous Month" style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+                <button class="cm-btn-pill-white" onclick="changeAttendanceMonth(-1)" title="Previous Month" style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center;">
                     <i data-feather="chevron-left" style="width:16px; height:16px;"></i>
                 </button>
                 <div id="attCalendarMonthTitle" style="font-size:16px; font-weight:800; min-width:170px; text-align:center; color:#0f172a; letter-spacing:-0.01em;">
                     <?= date('F Y') ?>
                 </div>
-                <button class="btn btn-outline btn-sm" onclick="changeAttendanceMonth(1)" title="Next Month" style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+                <button class="cm-btn-pill-white" onclick="changeAttendanceMonth(1)" title="Next Month" style="width:34px; height:34px; padding:0; display:flex; align-items:center; justify-content:center;">
                     <i data-feather="chevron-right" style="width:16px; height:16px;"></i>
                 </button>
-                <button class="btn btn-outline btn-sm" onclick="jumpAttendanceToToday()" style="border-radius:8px; font-weight:600;">Today</button>
+                <button class="cm-btn-pill-white" onclick="jumpAttendanceToToday()" style="padding:6px 14px; font-size:12px; font-weight:700;">Today</button>
             </div>
 
             <!-- Right: Employee Filter & Mark Action -->
@@ -593,7 +1116,7 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                 <?php if ($isHr || $isLead): ?>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <label style="font-size:12px; font-weight:700; color:#64748b;">Staff:</label>
-                        <select id="attCalendarEmployeeSelect" class="form-select form-select-sm" style="min-width:210px; max-width:260px;" onchange="onAttendanceEmployeeChanged()">
+                        <select id="attCalendarEmployeeSelect" class="cm-filter-select" style="min-width:210px; max-width:260px; padding:6px 14px; font-size:12.5px;" onchange="onAttendanceEmployeeChanged()">
                             <?php foreach ($managers as $m): ?>
                                 <option value="<?= $m['id'] ?>" <?= ($currEmp && $currEmp['id'] == $m['id']) ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($m['full_name']) ?> (<?= htmlspecialchars($m['employee_code']) ?>)
@@ -605,13 +1128,18 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                     <input type="hidden" id="attCalendarEmployeeSelect" value="<?= $currEmp ? $currEmp['id'] : 0 ?>">
                 <?php endif; ?>
 
-                <button class="btn btn-primary btn-sm" onclick="openMarkAttendanceModal()" style="display:flex; align-items:center; gap:6px; border-radius:8px; padding:8px 14px;">
-                    <i data-feather="plus" style="width:15px; height:15px;"></i>
+                <button class="cm-btn-primary" onclick="openMarkAttendanceModal()" style="padding:8px 18px; font-size:13px;">
+                    <i data-feather="plus" style="width:14px; height:14px;"></i>
                     <span>+ Mark Attendance</span>
                 </button>
 
+                <button type="button" class="cm-btn-primary" onclick="downloadAttendancePdf()" style="padding:7px 18px; font-size:12.5px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <i data-feather="file-text" style="width:14px; height:14px;"></i>
+                    <span>Download Attendance PDF</span>
+                </button>
+
                 <?php if ($isHr): ?>
-                    <a href="hr_export.php?type=attendance" id="attExportCsvBtn" class="btn btn-outline btn-sm" style="text-decoration:none; border-radius:8px; display:flex; align-items:center; gap:6px;">
+                    <a href="hr_export.php?type=attendance" id="attExportCsvBtn" class="cm-btn-pill-white" style="padding:7px 16px; font-size:12.5px;">
                         <i data-feather="download" style="width:14px; height:14px;"></i>
                         <span>Export CSV</span>
                     </a>
@@ -778,15 +1306,15 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- ==================================================================== -->
 <div id="tabView_leaves" style="display:none;">
     <!-- Leave Allocations Grid for Selected Employee / Self -->
-    <div class="card" style="margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+    <div class="card" style="margin-bottom:20px; border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
             <div>
-                <h3 style="font-size:16px; font-weight:700;">Leave Entitlements & Usage (<?= date('Y') ?>)</h3>
-                <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Configured policy balances and accumulated leaves</p>
+                <h3 style="font-size:16px; font-weight:800; color:#0f172a;">Leave Entitlements &amp; Usage (<?= date('Y') ?>)</h3>
+                <p style="font-size:12.5px; color:#64748b; margin:2px 0 0 0;">Configured policy balances and accumulated leaves</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <?php if ($isHr): ?>
-                    <select id="leaveBalanceEmpSelect" class="form-select" style="max-width:220px;" onchange="loadLeaveAllocations()">
+                    <select id="leaveBalanceEmpSelect" class="cm-filter-select" style="max-width:240px;" onchange="loadLeaveAllocations()">
                         <?php foreach ($managers as $m): ?>
                             <option value="<?= $m['id'] ?>" <?= ($currEmp && $currEmp['id'] == $m['id']) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($m['full_name']) ?> (<?= htmlspecialchars($m['employee_code']) ?>)
@@ -794,8 +1322,9 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                         <?php endforeach; ?>
                     </select>
                 <?php endif; ?>
-                <button class="btn btn-primary" onclick="openApplyLeaveModal()">
-                    <i data-feather="plus" style="width:14px; height:14px; margin-right:4px;"></i> Apply for Leave
+                <button type="button" class="cm-btn-primary" onclick="openApplyLeaveModal()" style="padding:8px 18px; font-size:13px;">
+                    <i data-feather="plus" style="width:14px; height:14px;"></i>
+                    <span>Apply for Leave</span>
                 </button>
             </div>
         </div>
@@ -804,35 +1333,37 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
         </div>
     </div>
 
-    <!-- Leave Requests Master Table -->
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
-            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                <select id="leaveFilterStatus" class="form-select" style="max-width:160px;" onchange="loadLeaveRequests()">
-                    <option value="">All Statuses</option>
-                    <option value="Pending" selected>Pending</option>
-                    <option value="Approved">Approved</option>
-                    <option value="Rejected">Rejected</option>
-                    <option value="Cancelled">Cancelled</option>
-                </select>
-                <select id="leaveFilterType" class="form-select" style="max-width:180px;" onchange="loadLeaveRequests()">
-                    <option value="">All Leave Types</option>
-                    <?php foreach ($leaveTypes as $lt): ?>
-                        <option value="<?= $lt['id'] ?>"><?= htmlspecialchars($lt['name']) ?> (<?= htmlspecialchars($lt['code']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
-                <button class="btn btn-outline" onclick="loadLeaveRequests()">Filter</button>
-            </div>
-
+    <!-- Filter Bar for Leaves -->
+    <div class="cm-filter-bar">
+        <div class="cm-filter-dropdowns">
+            <select id="leaveFilterStatus" class="cm-filter-select" onchange="loadLeaveRequests()">
+                <option value="">All Statuses</option>
+                <option value="Pending" selected>Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Cancelled">Cancelled</option>
+            </select>
+            <select id="leaveFilterType" class="cm-filter-select" onchange="loadLeaveRequests()">
+                <option value="">All Leave Types</option>
+                <?php foreach ($leaveTypes as $lt): ?>
+                    <option value="<?= $lt['id'] ?>"><?= htmlspecialchars($lt['name']) ?> (<?= htmlspecialchars($lt['code']) ?>)</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div>
             <?php if ($isHr || $isLead): ?>
-                <a href="hr_export.php?type=leaves" class="btn btn-outline" style="text-decoration:none;">
-                    <i data-feather="download" style="width:14px; height:14px; margin-right:4px;"></i> Export Leaves CSV
+                <a href="hr_export.php?type=leaves" class="cm-btn-pill-white" style="font-size:12.5px; padding:7px 16px;">
+                    <i data-feather="download" style="width:14px; height:14px;"></i>
+                    <span>Export Leaves CSV</span>
                 </a>
             <?php endif; ?>
         </div>
+    </div>
 
-        <div class="table-responsive">
-            <table class="table">
+    <!-- Leave Requests Master Table Card -->
+    <div class="cm-table-card">
+        <div class="cm-table-wrapper">
+            <table class="cm-table">
                 <thead>
                     <tr>
                         <th>Req #</th>
@@ -848,7 +1379,7 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                     </tr>
                 </thead>
                 <tbody id="leaveRequestsTableBody">
-                    <tr><td colspan="10" style="text-align:center; padding:30px;">Loading leave requests...</td></tr>
+                    <tr><td colspan="10" style="text-align:center; padding:35px; color:#64748b;">Loading leave requests...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -862,16 +1393,16 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <div id="tabView_departments" style="display:none;">
     <div class="grid-2">
         <!-- Departments Column -->
-        <div class="card">
+        <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div>
-                    <h3 style="font-size:16px; font-weight:700;">Agency Departments</h3>
+                    <h3 style="font-size:16px; font-weight:800; color:#0f172a;">Agency Departments</h3>
                     <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Manage functional units and headcounts</p>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="openDepartmentModal()">+ Add Dept</button>
+                <button type="button" class="cm-btn-primary" onclick="openDepartmentModal()" style="padding:6px 16px; font-size:12.5px;">+ Add Dept</button>
             </div>
-            <div class="table-responsive">
-                <table class="table">
+            <div class="cm-table-wrapper">
+                <table class="cm-table">
                     <thead>
                         <tr>
                             <th>Code</th>
@@ -882,23 +1413,23 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                         </tr>
                     </thead>
                     <tbody id="departmentsTableBody">
-                        <tr><td colspan="5" style="text-align:center; padding:20px;">Loading departments...</td></tr>
+                        <tr><td colspan="5" style="text-align:center; padding:25px; color:#64748b;">Loading departments...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
         <!-- Designations Column -->
-        <div class="card">
+        <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div>
-                    <h3 style="font-size:16px; font-weight:700;">Designations & Job Titles</h3>
+                    <h3 style="font-size:16px; font-weight:800; color:#0f172a;">Designations &amp; Job Titles</h3>
                     <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Organizational roles linked to departments</p>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="openDesignationModal()">+ Add Title</button>
+                <button type="button" class="cm-btn-primary" onclick="openDesignationModal()" style="padding:6px 16px; font-size:12.5px;">+ Add Title</button>
             </div>
-            <div class="table-responsive">
-                <table class="table">
+            <div class="cm-table-wrapper">
+                <table class="cm-table">
                     <thead>
                         <tr>
                             <th>Job Title</th>
@@ -909,7 +1440,7 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                         </tr>
                     </thead>
                     <tbody id="designationsTableBody">
-                        <tr><td colspan="5" style="text-align:center; padding:20px;">Loading designations...</td></tr>
+                        <tr><td colspan="5" style="text-align:center; padding:25px; color:#64748b;">Loading designations...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -922,40 +1453,41 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- TAB 6: HOLIDAY CALENDAR                                              -->
 <!-- ==================================================================== -->
 <div id="tabView_holidays" style="display:none;">
-    <div class="card">
+    <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
             <div>
-                <h3 style="font-size:16px; font-weight:700;">Agency Holiday Calendar (<?= date('Y') ?>)</h3>
-                <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Official non-working days reflected in attendance and leaves</p>
+                <h3 style="font-size:16px; font-weight:800; color:#0f172a;">Agency Holiday Calendar (<?= date('Y') ?>)</h3>
+                <p style="font-size:12.5px; color:#64748b; margin:2px 0 0 0;">Official non-working days reflected in attendance and leaves</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <select id="holidayYearSelect" class="form-select" style="max-width:140px;" onchange="loadHolidays()">
+                <select id="holidayYearSelect" class="cm-filter-select" style="max-width:140px;" onchange="loadHolidays()">
                     <option value="<?= date('Y') - 1 ?>"><?= date('Y') - 1 ?></option>
                     <option value="<?= date('Y') ?>" selected><?= date('Y') ?></option>
                     <option value="<?= date('Y') + 1 ?>"><?= date('Y') + 1 ?></option>
                 </select>
                 <?php if ($isHr): ?>
-                    <button class="btn btn-primary" onclick="openHolidayModal()">
-                        <i data-feather="plus" style="width:14px; height:14px; margin-right:4px;"></i> Add Holiday
+                    <button type="button" class="cm-btn-primary" onclick="openHolidayModal()" style="padding:8px 18px; font-size:13px;">
+                        <i data-feather="plus" style="width:14px; height:14px;"></i>
+                        <span>Add Holiday</span>
                     </button>
                 <?php endif; ?>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table">
+        <div class="cm-table-wrapper">
+            <table class="cm-table">
                 <thead>
                     <tr>
                         <th>Holiday Date</th>
                         <th>Day</th>
                         <th>Holiday Title</th>
-                        <th>Description & Scope</th>
+                        <th>Description &amp; Scope</th>
                         <th>Type</th>
                         <?php if ($isHr): ?><th style="text-align:right;">Actions</th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody id="holidaysTableBody">
-                    <tr><td colspan="<?= $isHr ? 6 : 5 ?>" style="text-align:center; padding:30px;">Loading holiday calendar...</td></tr>
+                    <tr><td colspan="<?= $isHr ? 6 : 5 ?>" style="text-align:center; padding:35px; color:#64748b;">Loading holiday calendar...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -966,29 +1498,30 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- TAB 7: EMPLOYEE DOCUMENTS VAULT                                      -->
 <!-- ==================================================================== -->
 <div id="tabView_documents" style="display:none;">
-    <div class="card">
+    <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
             <div>
-                <h3 style="font-size:16px; font-weight:700;">Secure Employee Document Vault</h3>
-                <p style="font-size:12px; color:#64748b; margin:2px 0 0 0;">Offer letters, appointment letters, IDs, certificates, and NDA agreements</p>
+                <h3 style="font-size:16px; font-weight:800; color:#0f172a;">Secure Employee Document Vault</h3>
+                <p style="font-size:12.5px; color:#64748b; margin:2px 0 0 0;">Offer letters, appointment letters, IDs, certificates, and NDA agreements</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <?php if ($isHr): ?>
-                    <select id="docEmpSelect" class="form-select" style="max-width:240px;" onchange="loadEmployeeDocuments()">
+                    <select id="docEmpSelect" class="cm-filter-select" style="max-width:240px;" onchange="loadEmployeeDocuments()">
                         <option value="">-- All Employees --</option>
                         <?php foreach ($managers as $m): ?>
                             <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['full_name']) ?> (<?= htmlspecialchars($m['employee_code']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 <?php endif; ?>
-                <button class="btn btn-primary" onclick="openUploadDocModal()">
-                    <i data-feather="upload" style="width:14px; height:14px; margin-right:4px;"></i> Upload Document
+                <button type="button" class="cm-btn-primary" onclick="openUploadDocModal()" style="padding:8px 18px; font-size:13px;">
+                    <i data-feather="upload" style="width:14px; height:14px;"></i>
+                    <span>Upload Document</span>
                 </button>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table">
+        <div class="cm-table-wrapper">
+            <table class="cm-table">
                 <thead>
                     <tr>
                         <th>Document Title</th>
@@ -1001,7 +1534,7 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                     </tr>
                 </thead>
                 <tbody id="documentsTableBody">
-                    <tr><td colspan="7" style="text-align:center; padding:30px;">Loading document records...</td></tr>
+                    <tr><td colspan="7" style="text-align:center; padding:35px; color:#64748b;">Loading document records...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1013,41 +1546,53 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
 <!-- ==================================================================== -->
 <?php if ($isHr || $isLead): ?>
 <div id="tabView_reports" style="display:none;">
-    <div class="card" style="margin-bottom:20px;">
+    <div class="card" style="margin-bottom:20px; border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); padding:16px 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                <select id="hrReportType" class="form-select" style="max-width:240px;" onchange="loadHrReport()">
-                    <option value="employees_status">Workforce Master Roster</option>
+                <select id="hrReportType" class="cm-filter-select" style="max-width:270px;" onchange="loadHrReport()">
+                    <option value="monthly_leaves">📋 Month-wise Leaves &amp; Approvals</option>
+                    <option value="monthly_employees">👥 Month-wise Workforce &amp; Joiners</option>
+                    <option value="monthly_attendance_matrix">🕒 Month-wise Attendance &amp; Hours Matrix</option>
+                    <option value="employees_status">Workforce Master Roster (All Time)</option>
                     <option value="department_headcount">Department Headcount BI</option>
-                    <option value="monthly_attendance">Monthly Attendance Summary</option>
-                    <option value="leave_usage">Leave Accrual & Utilization</option>
+                    <option value="monthly_attendance">Monthly Attendance Log Summary</option>
+                    <option value="leave_usage">Annual Leave Accrual &amp; Balance</option>
                 </select>
-                <select id="hrReportDept" class="form-select" style="max-width:180px;" onchange="loadHrReport()">
+                <select id="hrReportDept" class="cm-filter-select" style="max-width:180px;" onchange="loadHrReport()">
                     <option value="">All Departments</option>
                     <?php foreach ($departments as $d): ?>
                         <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <input type="month" id="hrReportMonth" class="form-control" style="max-width:160px;" value="<?= date('Y-m') ?>" onchange="loadHrReport()">
-                <button class="btn btn-outline" onclick="loadHrReport()">Generate</button>
+                <input type="month" id="hrReportMonth" class="form-control" style="max-width:160px; border-radius:999px; font-size:13px;" value="<?= date('Y-m') ?>" onchange="loadHrReport()">
+                <button type="button" class="cm-btn-pill-white" onclick="loadHrReport()" style="padding:7px 18px; font-size:13px;">Generate</button>
             </div>
-            <div>
-                <button class="btn btn-primary" onclick="exportCurrentReportCsv()">
-                    <i data-feather="download" style="width:14px; height:14px; margin-right:4px;"></i> Export Report CSV
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="cm-btn-primary" onclick="downloadCurrentHrReportPdf()" style="padding:8px 18px; font-size:13px; background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <i data-feather="file-text" style="width:14px; height:14px;"></i>
+                    <span>Download PDF Report</span>
+                </button>
+                <button type="button" class="cm-btn-pill-white" onclick="exportCurrentReportCsv()" style="padding:7px 16px; font-size:13px;">
+                    <i data-feather="download" style="width:14px; height:14px;"></i>
+                    <span>Export CSV</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <h3 id="reportTitleHeader" style="font-size:16px; font-weight:700; margin-bottom:14px;">Workforce Master Roster</h3>
-        <div class="table-responsive">
-            <table class="table" id="reportDynamicTable">
+    <!-- Dynamic HR Report KPI Metric Cards -->
+    <div id="hrReportKpiRow" style="margin-bottom:20px; display:none;"></div>
+
+    <div class="card" style="border-radius:20px; border:1px solid #f1f5f9; box-shadow:0 4px 20px rgba(0,0,0,0.025); overflow:hidden;">
+        <h3 id="reportTitleHeader" style="font-size:16px; font-weight:800; color:#0f172a; margin-bottom:16px;">Month-wise Leave Applications</h3>
+        <div class="cm-table-wrapper">
+            <table class="cm-table" id="reportDynamicTable">
                 <thead id="reportTableHead"></thead>
                 <tbody id="reportTableBody"></tbody>
             </table>
         </div>
     </div>
+</div>
 </div>
 <?php endif; ?>
 
@@ -1806,13 +2351,15 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
             const view = document.getElementById(`tabView_${t}`);
             if (btn) {
                 if (t === tab) {
-                    btn.style.borderBottom = '3px solid #2563eb';
-                    btn.style.color = '#2563eb';
-                    btn.style.fontWeight = '700';
+                    btn.classList.add('active');
+                    btn.style.borderBottom = '';
+                    btn.style.color = '';
+                    btn.style.fontWeight = '';
                 } else {
-                    btn.style.borderBottom = '3px solid transparent';
-                    btn.style.color = '#64748b';
-                    btn.style.fontWeight = '500';
+                    btn.classList.remove('active');
+                    btn.style.borderBottom = '';
+                    btn.style.color = '';
+                    btn.style.fontWeight = '';
                 }
             }
             if (view) {
@@ -1821,6 +2368,7 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
         });
 
         refreshCurrentTab();
+        if (window.feather) feather.replace();
     }
 
     function refreshCurrentTab() {
@@ -2462,19 +3010,45 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                             presPill += `<div style="font-size:10px; color:#64748b; margin-top:2px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(a.status_note)}">"${escapeHtml(a.status_note)}"</div>`;
                         }
 
+                        const avatarPalettes = [
+                            { bg: '#f3e8ff', text: '#7c3aed' },
+                            { bg: '#e0f2fe', text: '#0284c7' },
+                            { bg: '#ffedd5', text: '#ea580c' },
+                            { bg: '#fce7f3', text: '#db2777' },
+                            { bg: '#cffafe', text: '#0891b2' },
+                            { bg: '#ecfdf5', text: '#059669' }
+                        ];
+                        const palette = avatarPalettes[parseInt(a.employee_id, 10) % avatarPalettes.length];
+                        const names = (a.full_name || 'Staff').trim().split(/\s+/);
+                        let initials = names.length >= 2 ? (names[0][0] + names[1][0]).toUpperCase() : names[0].substring(0, 2).toUpperCase();
+
+                        let statusPillClass = 'cm-status-active';
+                        if (statusText === 'Half Day' || statusText === 'On Leave') statusPillClass = 'cm-status-pending';
+                        else if (statusText === 'Absent' || statusText === 'Not Marked') statusPillClass = 'cm-status-suspended';
+
                         html += `
                             <tr>
-                                <td><strong>${escapeHtml(a.full_name)}</strong> <small style="color:#64748b;">(${a.employee_code})</small></td>
-                                <td>${escapeHtml(a.department_name || 'General')}</td>
+                                <td>
+                                    <div class="cm-client-cell">
+                                        <div class="cm-avatar" style="background:${palette.bg}; color:${palette.text}; width:32px; height:32px; font-size:11.5px;">
+                                            ${escapeHtml(initials)}
+                                        </div>
+                                        <div class="cm-client-info">
+                                            <span style="font-weight:700; color:#0f172a; font-size:13px;">${escapeHtml(a.full_name)}</span>
+                                            <span class="cm-contact-sub" style="font-family:monospace; font-size:11px;">${escapeHtml(a.employee_code)}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span style="font-size:12.5px; font-weight:600; color:#475569;">${escapeHtml(a.department_name || 'General')}</span></td>
                                 <td>${presPill}</td>
                                 <td>${s1Pill}</td>
                                 <td>${s2Pill}</td>
-                                <td><span class="badge ${badgeClass}">${statusText}</span></td>
-                                <td>${a.total_hours ? a.total_hours + ' hrs' : '--'}</td>
+                                <td><span class="cm-status-pill ${statusPillClass}"><span class="cm-status-dot">●</span> ${statusText}</span></td>
+                                <td><strong style="color:#0f172a; font-size:12.5px;">${a.total_hours ? a.total_hours + ' hrs' : '--'}</strong></td>
                                 <td style="text-align:right;">
                                     ${canMarkRow
-                                        ? `<button class="btn btn-outline btn-sm" onclick="openMarkAttendanceModal('<?= date('Y-m-d') ?>', ${a.employee_id})" style="border-radius:6px; font-size:11px;">Mark / Edit</button>`
-                                        : `<span style="color:#94a3b8; font-size:11px;">View Only</span>`
+                                        ? `<button type="button" class="cm-btn-pill-white" onclick="openMarkAttendanceModal('<?= date('Y-m-d') ?>', ${a.employee_id})" style="padding:4px 12px; font-size:11.5px;">Mark / Edit</button>`
+                                        : `<span style="color:#94a3b8; font-size:11.5px;">View Only</span>`
                                     }
                                 </td>
                             </tr>
@@ -2560,38 +3134,89 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
             .then(data => {
                 const tbody = document.getElementById('employeesTableBody');
                 if (!data.success || data.employees.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">No employees match the criteria.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:35px; color:#64748b;">No employees match the criteria.</td></tr>';
                     return;
                 }
 
+                const avatarPalettes = [
+                    { bg: '#f3e8ff', text: '#7c3aed' },
+                    { bg: '#e0f2fe', text: '#0284c7' },
+                    { bg: '#ffedd5', text: '#ea580c' },
+                    { bg: '#fce7f3', text: '#db2777' },
+                    { bg: '#cffafe', text: '#0891b2' },
+                    { bg: '#ecfdf5', text: '#059669' }
+                ];
+
                 let html = '';
-                data.employees.forEach(e => {
-                    const statusClass = e.employment_status === 'Active' ? 'badge-primary' : (e.employment_status === 'On Leave' ? 'badge-warning' : 'badge-danger');
+                data.employees.forEach((e, idx) => {
+                    const palette = avatarPalettes[idx % avatarPalettes.length];
+                    const names = (e.full_name || 'Staff').trim().split(/\s+/);
+                    let initials = names.length >= 2 ? (names[0][0] + names[1][0]).toUpperCase() : names[0].substring(0, 2).toUpperCase();
+
+                    const isAct = e.employment_status === 'Active';
+                    const isLve = e.employment_status === 'On Leave';
+                    const statusClass = isAct ? 'cm-status-active' : (isLve ? 'cm-status-pending' : 'cm-status-suspended');
+                    const statusDot = '●';
+
                     html += `
                         <tr>
-                            <td><strong style="color:#2563eb;">${e.employee_code}</strong></td>
                             <td>
-                                <div style="font-weight:700; color:#0f172a;">${escapeHtml(e.full_name)}</div>
-                                ${e.linked_username ? `<small style="color:#64748b;">Login: @${escapeHtml(e.linked_username)}</small>` : ''}
+                                <span class="cm-portal-pill" style="font-family:monospace; font-weight:700;">${escapeHtml(e.employee_code)}</span>
                             </td>
                             <td>
-                                <div>${escapeHtml(e.designation_title || 'Staff')}</div>
-                                <small style="color:#64748b;">${escapeHtml(e.department_name || 'General')}</small>
+                                <div class="cm-client-cell">
+                                    <div class="cm-avatar" style="background:${palette.bg}; color:${palette.text};">
+                                        ${escapeHtml(initials)}
+                                    </div>
+                                    <div class="cm-client-info">
+                                        <a href="javascript:void(0)" onclick="viewEmployeeDossier(${e.id})" class="cm-company-link">
+                                            ${escapeHtml(e.full_name)}
+                                        </a>
+                                        ${e.linked_username ? `<span class="cm-contact-sub">@${escapeHtml(e.linked_username)}</span>` : '<span class="cm-contact-sub">No linked login</span>'}
+                                    </div>
+                                </div>
                             </td>
                             <td>
-                                <div>${escapeHtml(e.email)}</div>
-                                <small style="color:#64748b;">${escapeHtml(e.phone || '--')}</small>
+                                <div style="font-weight:700; color:#0f172a; font-size:13.5px;">${escapeHtml(e.designation_title || 'Staff')}</div>
+                                <small style="color:#64748b; font-size:12px;">${escapeHtml(e.department_name || 'General')}</small>
                             </td>
-                            <td>${e.date_of_joining}</td>
-                            <td>${escapeHtml(e.employment_type || 'Full-time')}</td>
-                            <td><span class="badge ${statusClass}">${e.employment_status}</span></td>
+                            <td>
+                                <div class="cm-meta-cell">
+                                    <div class="cm-meta-line" title="Email">
+                                        <i data-feather="mail"></i>
+                                        <span>${escapeHtml(e.email || '-')}</span>
+                                    </div>
+                                    <div class="cm-meta-line" title="Phone">
+                                        <i data-feather="phone"></i>
+                                        <span>${escapeHtml(e.phone || '-')}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:5px; color:#475569; font-size:12.5px;">
+                                    <i data-feather="calendar" style="width:13px; height:13px; color:#94a3b8;"></i>
+                                    <span>${e.date_of_joining || '-'}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="cm-portal-pill" style="background:#f1f5f9; color:#475569;">${escapeHtml(e.employment_type || 'Full-time')}</span>
+                            </td>
+                            <td>
+                                <span class="cm-status-pill ${statusClass}">
+                                    <span class="cm-status-dot">${statusDot}</span> ${escapeHtml(e.employment_status)}
+                                </span>
+                            </td>
                             <td style="text-align:right;">
-                                <div style="display:flex; justify-content:flex-end; gap:6px;">
-                                    <button class="btn btn-outline btn-sm" onclick="viewEmployeeDossier(${e.id})">Profile</button>
+                                <div style="display:flex; justify-content:flex-end; gap:6px; align-items:center;">
+                                    <button class="cm-action-icon-btn" onclick="viewEmployeeDossier(${e.id})" title="View Profile Dossier">
+                                        <i data-feather="eye"></i>
+                                    </button>
                                     ${isHrAdmin ? `
-                                        <button class="btn btn-outline btn-sm" onclick="editEmployeeRecord(${e.id})">Edit</button>
-                                        <button class="btn btn-outline btn-sm" style="color:#dc2626; border-color:#fca5a5;" onclick="toggleEmployeeStatus(${e.id})">
-                                            ${e.employment_status === 'Active' ? 'Deactivate' : 'Activate'}
+                                        <button class="cm-action-icon-btn" onclick="editEmployeeRecord(${e.id})" title="Edit Employee">
+                                            <i data-feather="edit-2"></i>
+                                        </button>
+                                        <button class="cm-action-icon-btn" style="color:${isAct ? '#dc2626' : '#16a34a'};" onclick="toggleEmployeeStatus(${e.id})" title="${isAct ? 'Deactivate Employee' : 'Activate Employee'}">
+                                            <i data-feather="${isAct ? 'user-x' : 'user-check'}"></i>
                                         </button>
                                     ` : ''}
                                 </div>
@@ -3371,11 +3996,35 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
         });
     }
 
+    // Download Attendance PDF
+    function downloadAttendancePdf() {
+        const empSelect = document.getElementById('attCalendarEmployeeSelect');
+        const empId = empSelect ? empSelect.value : 0;
+        const d = (typeof currentAttCalendarDate !== 'undefined' && currentAttCalendarDate) ? currentAttCalendarDate : new Date();
+        const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        window.open(`attendance_pdf.php?month=${monthStr}&employee_id=${empId}&autoprint=1`, '_blank');
+    }
+
+    // Download Current HR Report PDF
+    function downloadCurrentHrReportPdf() {
+        const type = document.getElementById('hrReportType').value;
+        const month = document.getElementById('hrReportMonth').value;
+        const deptId = document.getElementById('hrReportDept').value;
+        if (type === 'monthly_leaves' || type === 'leave_usage') {
+            window.open(`hr_report_pdf.php?type=leaves&month=${month}&department_id=${deptId}&autoprint=1`, '_blank');
+        } else if (type === 'monthly_employees' || type === 'employees_status' || type === 'department_headcount') {
+            window.open(`hr_report_pdf.php?type=employees&month=${month}&department_id=${deptId}&autoprint=1`, '_blank');
+        } else {
+            window.open(`attendance_pdf.php?month=${month}&department_id=${deptId}&autoprint=1`, '_blank');
+        }
+    }
+
     // 8. HR REPORTS
     function loadHrReport() {
         const type = document.getElementById('hrReportType').value;
         const deptId = document.getElementById('hrReportDept').value;
         const month = document.getElementById('hrReportMonth').value;
+        const kpiRow = document.getElementById('hrReportKpiRow');
 
         fetch(`api.php?action=get_hr_reports_data&report_type=${type}&department_id=${deptId}&month=${month}`)
             .then(r => r.json())
@@ -3383,50 +4032,191 @@ $leaveTypes = $db->query("SELECT * FROM leave_types WHERE is_active = 1 ORDER BY
                 const thead = document.getElementById('reportTableHead');
                 const tbody = document.getElementById('reportTableBody');
                 const title = document.getElementById('reportTitleHeader');
+                const s = data.summary || {};
 
-                if (type === 'employees_status') {
+                if (type === 'monthly_leaves') {
+                    title.textContent = `Month-wise Leaves & Approvals (${month})`;
+                    if (kpiRow) {
+                        kpiRow.style.display = 'grid';
+                        kpiRow.className = 'grid-4';
+                        kpiRow.innerHTML = `
+                            <div class="card att-kpi-card" style="border-left:4px solid #2563eb; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Applications</div>
+                                <div style="font-size:22px; font-weight:800; color:#1e40af; margin-top:2px;">${s.total_requests ?? 0}</div>
+                                <small style="color:#64748b; font-size:11px;">In ${month}</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #10b981; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Approved Days</div>
+                                <div style="font-size:22px; font-weight:800; color:#15803d; margin-top:2px;">${s.approved_days ?? 0}d</div>
+                                <small style="color:#16a34a; font-size:11px;">${s.approved_count ?? 0} Approved</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #f59e0b; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Pending Review</div>
+                                <div style="font-size:22px; font-weight:800; color:#b45309; margin-top:2px;">${s.pending_count ?? 0}</div>
+                                <small style="color:#d97706; font-size:11px;">Awaiting Manager</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #ef4444; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Rejected</div>
+                                <div style="font-size:22px; font-weight:800; color:#b91c1c; margin-top:2px;">${s.rejected_count ?? 0}</div>
+                                <small style="color:#dc2626; font-size:11px;">Declined</small>
+                            </div>
+                        `;
+                    }
+                    thead.innerHTML = `<tr><th>Code</th><th>Employee</th><th>Department</th><th>Leave Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th><th>Reason</th><th>Reviewer</th></tr>`;
+                    let rows = '';
+                    (data.data || []).forEach(r => {
+                        const stBadge = r.status === 'Approved' ? 'badge-success' : (r.status === 'Rejected' ? 'badge-danger' : 'badge-warning');
+                        rows += `
+                            <tr>
+                                <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#2563eb;">${escapeHtml(r.employee_code)}</td>
+                                <td><strong>${escapeHtml(r.employee_name)}</strong></td>
+                                <td>${escapeHtml(r.department_name || 'General')}</td>
+                                <td><span class="badge" style="background:#f3e8ff; color:#7e22ce;">${escapeHtml(r.leave_type_name)}</span></td>
+                                <td>${r.start_date}</td>
+                                <td>${r.end_date}</td>
+                                <td><strong>${r.total_days}d</strong></td>
+                                <td><span class="badge ${stBadge}">${escapeHtml(r.status)}</span></td>
+                                <td>${escapeHtml(r.reason || '--')}</td>
+                                <td>${escapeHtml(r.reviewer_name || '--')}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = rows || '<tr><td colspan="10" style="text-align:center; padding:30px;">No leave applications found for this month.</td></tr>';
+
+                } else if (type === 'monthly_employees') {
+                    title.textContent = `Month-wise Workforce Roster & Joiners (${month})`;
+                    if (kpiRow) {
+                        kpiRow.style.display = 'grid';
+                        kpiRow.className = 'grid-4';
+                        kpiRow.innerHTML = `
+                            <div class="card att-kpi-card" style="border-left:4px solid #2563eb; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Total Headcount</div>
+                                <div style="font-size:22px; font-weight:800; color:#1e40af; margin-top:2px;">${s.total_headcount ?? 0}</div>
+                                <small style="color:#64748b; font-size:11px;">Staff Directory</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #10b981; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Active Employees</div>
+                                <div style="font-size:22px; font-weight:800; color:#15803d; margin-top:2px;">${s.active_count ?? 0}</div>
+                                <small style="color:#16a34a; font-size:11px;">On Roll</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #06b6d4; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">New Joiners</div>
+                                <div style="font-size:22px; font-weight:800; color:#0e7490; margin-top:2px;">${s.new_joiners ?? 0}</div>
+                                <small style="color:#0891b2; font-size:11px;">Joined in ${month}</small>
+                            </div>
+                            <div class="card att-kpi-card" style="border-left:4px solid #8b5cf6; margin:0; padding:12px 16px;">
+                                <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Staff on Leave</div>
+                                <div style="font-size:22px; font-weight:800; color:#6b21a8; margin-top:2px;">${s.on_leave ?? 0}</div>
+                                <small style="color:#7e22ce; font-size:11px;">Took Leave in Month</small>
+                            </div>
+                        `;
+                    }
+                    thead.innerHTML = `<tr><th>Code</th><th>Name</th><th>Email &amp; Phone</th><th>Department</th><th>Title</th><th>Joining Date</th><th>Type</th><th>Present</th><th>Leaves</th><th>Status</th></tr>`;
+                    let rows = '';
+                    (data.data || []).forEach(r => {
+                        const isNew = r.is_new_joiner ? ' <span class="badge badge-primary" style="font-size:9.5px;">★ New</span>' : '';
+                        rows += `
+                            <tr>
+                                <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#2563eb;">${escapeHtml(r.employee_code)}</td>
+                                <td><strong>${escapeHtml(r.full_name)}</strong>${isNew}</td>
+                                <td>${escapeHtml(r.email)}<br><small style="color:#64748b;">${escapeHtml(r.phone || '--')}</small></td>
+                                <td>${escapeHtml(r.department_name || 'General')}</td>
+                                <td>${escapeHtml(r.designation_title || 'Staff')}</td>
+                                <td>${r.date_of_joining || '--'}</td>
+                                <td>${escapeHtml(r.employment_type || 'Full Time')}</td>
+                                <td style="font-weight:700; color:#16a34a;">${r.month_present_days || 0}</td>
+                                <td style="font-weight:700; color:#7e22ce;">${r.month_leave_days || 0}d</td>
+                                <td><span class="badge ${r.employment_status === 'Active' ? 'badge-success' : 'badge-danger'}">${escapeHtml(r.employment_status)}</span></td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = rows || '<tr><td colspan="10" style="text-align:center; padding:30px;">No employee records found.</td></tr>';
+
+                } else if (type === 'monthly_attendance_matrix') {
+                    title.textContent = `Workforce Attendance & Hours Matrix (${month})`;
+                    if (kpiRow) kpiRow.style.display = 'none';
+                    thead.innerHTML = `<tr><th>Code</th><th>Name</th><th>Department</th><th>Present</th><th>Half Day</th><th>WFH</th><th>Leave</th><th>Absent</th><th>Total Hours</th><th>Payable Days</th><th>Attendance Rate</th></tr>`;
+                    let rows = '';
+                    (data.data || []).forEach(r => {
+                        const rateClass = r.attendance_pct >= 80 ? 'badge-success' : (r.attendance_pct >= 50 ? 'badge-warning' : 'badge-danger');
+                        rows += `
+                            <tr>
+                                <td style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#2563eb;">
+                                    <a href="attendance_pdf.php?month=${encodeURIComponent(month)}&employee_id=${r.employee_id}" target="_blank" style="color:#2563eb; text-decoration:none;">
+                                        ${escapeHtml(r.employee_code)}
+                                    </a>
+                                </td>
+                                <td><strong>${escapeHtml(r.full_name)}</strong></td>
+                                <td>${escapeHtml(r.department_name || 'General')}</td>
+                                <td style="font-weight:700; color:#16a34a;">${r.present_days}</td>
+                                <td style="color:#d97706;">${r.half_days}</td>
+                                <td style="color:#0891b2;">${r.wfh_days}</td>
+                                <td style="color:#7e22ce;">${r.leave_days}</td>
+                                <td style="color:#dc2626;">${r.absent_days}</td>
+                                <td style="font-weight:700;">${Number(r.total_hours).toFixed(1)}h</td>
+                                <td style="font-weight:800; color:#1e40af;">${Number(r.payable_days).toFixed(1)}</td>
+                                <td><span class="badge ${rateClass}">${r.attendance_pct}%</span></td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = rows || '<tr><td colspan="11" style="text-align:center; padding:30px;">No attendance records found for this period.</td></tr>';
+
+                } else if (type === 'employees_status') {
+                    if (kpiRow) kpiRow.style.display = 'none';
                     title.textContent = 'Workforce Master Roster';
                     thead.innerHTML = `<tr><th>Code</th><th>Name</th><th>Email</th><th>Phone</th><th>Department</th><th>Title</th><th>Type</th><th>Location</th><th>Joined</th><th>Status</th></tr>`;
                     let rows = '';
-                    data.data.forEach(r => {
+                    (data.data || []).forEach(r => {
                         rows += `<tr><td><strong>${r.employee_code}</strong></td><td>${escapeHtml(r.full_name)}</td><td>${r.email}</td><td>${r.phone||'--'}</td><td>${r.department_name||'--'}</td><td>${r.designation_title||'--'}</td><td>${r.employment_type}</td><td>${r.work_location}</td><td>${r.date_of_joining}</td><td><span class="badge ${r.employment_status==='Active'?'badge-primary':'badge-danger'}">${r.employment_status}</span></td></tr>`;
                     });
                     tbody.innerHTML = rows || '<tr><td colspan="10" style="text-align:center; padding:20px;">No records</td></tr>';
+
                 } else if (type === 'department_headcount') {
+                    if (kpiRow) kpiRow.style.display = 'none';
                     title.textContent = 'Department Headcount BI Breakdown';
                     thead.innerHTML = `<tr><th>Department</th><th>Code</th><th>Total Staff</th><th>Active</th><th>Inactive</th></tr>`;
                     let rows = '';
-                    data.data.forEach(r => {
+                    (data.data || []).forEach(r => {
                         rows += `<tr><td><strong>${escapeHtml(r.name)}</strong></td><td>${r.code||'--'}</td><td><strong>${r.total_headcount}</strong></td><td><span class="badge badge-primary">${r.active_count}</span></td><td><span class="badge badge-secondary">${r.inactive_count}</span></td></tr>`;
                     });
                     tbody.innerHTML = rows || '<tr><td colspan="5" style="text-align:center; padding:20px;">No records</td></tr>';
+
                 } else if (type === 'monthly_attendance') {
-                    title.textContent = `Monthly Attendance Matrix (${month})`;
+                    if (kpiRow) kpiRow.style.display = 'none';
+                    title.textContent = `Monthly Attendance Summary Log (${month})`;
                     thead.innerHTML = `<tr><th>Date</th><th>Status Category</th><th>Employee Count</th><th>Avg Work Hours</th></tr>`;
                     let rows = '';
-                    data.data.forEach(r => {
+                    (data.data || []).forEach(r => {
                         rows += `<tr><td><strong>${r.attendance_date}</strong></td><td><span class="badge badge-primary">${r.status}</span></td><td>${r.count}</td><td>${r.avg_hours ? Number(r.avg_hours).toFixed(1) + ' hrs' : '--'}</td></tr>`;
                     });
                     tbody.innerHTML = rows || '<tr><td colspan="4" style="text-align:center; padding:20px;">No records</td></tr>';
+
                 } else if (type === 'leave_usage') {
-                    title.textContent = 'Leave Usage & Accrual Analytics';
+                    if (kpiRow) kpiRow.style.display = 'none';
+                    title.textContent = 'Annual Leave Usage & Accrual Balance';
                     thead.innerHTML = `<tr><th>Leave Type</th><th>Code</th><th>Total Allocated</th><th>Used Days</th><th>Remaining Days</th></tr>`;
                     let rows = '';
-                    data.data.forEach(r => {
+                    (data.data || []).forEach(r => {
                         rows += `<tr><td><strong>${escapeHtml(r.leave_type)}</strong></td><td>${r.code}</td><td>${r.total_allocated||0}</td><td>${r.total_used||0}</td><td><strong>${r.total_remaining||0}</strong></td></tr>`;
                     });
                     tbody.innerHTML = rows || '<tr><td colspan="5" style="text-align:center; padding:20px;">No records</td></tr>';
                 }
+                if (typeof feather !== 'undefined') feather.replace();
             });
     }
 
     function exportCurrentReportCsv() {
         const type = document.getElementById('hrReportType').value;
         const month = document.getElementById('hrReportMonth').value;
-        if (type === 'employees_status') window.location.href = 'hr_export.php?type=employees';
-        else if (type === 'monthly_attendance') window.location.href = `hr_export.php?type=attendance&month=${month}`;
-        else if (type === 'leave_usage') window.location.href = 'hr_export.php?type=leaves';
-        else window.location.href = 'hr_export.php?type=employees';
+        if (type === 'monthly_leaves' || type === 'leave_usage') {
+            window.location.href = `hr_export.php?type=monthly_leaves&month=${month}`;
+        } else if (type === 'monthly_employees' || type === 'employees_status') {
+            window.location.href = `hr_export.php?type=monthly_employees&month=${month}`;
+        } else if (type === 'monthly_attendance_matrix' || type === 'monthly_attendance') {
+            window.location.href = `hr_export.php?type=attendance&month=${month}`;
+        } else {
+            window.location.href = `hr_export.php?type=${type}&month=${month}`;
+        }
     }
 
     function filterDesignationsByDept() {

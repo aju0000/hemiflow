@@ -30,18 +30,63 @@ try {
             $completedTasks = $db->prepare("SELECT COUNT(*) FROM tasks WHERE client_id = ? AND status = 'COMPLETED' AND is_deleted = 0");
             $completedTasks->execute([$clientId]);
 
-            // Recent Project Progress
+            // Recent Project Progress with Services and Tasks
             $stmtProj = $db->prepare("
                 SELECT p.*,
                 (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.is_deleted = 0) as total_tasks,
                 (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'COMPLETED' AND t.is_deleted = 0) as completed_tasks
-                FROM projects p WHERE p.client_id = ? ORDER BY p.id DESC LIMIT 5
+                FROM projects p WHERE p.client_id = ? ORDER BY p.id DESC LIMIT 10
             ");
             $stmtProj->execute([$clientId]);
             $projects = $stmtProj->fetchAll();
 
+            $staffMap = [];
+            $stUsers = $db->query("SELECT id, full_name, department FROM users");
+            if ($stUsers) {
+                foreach ($stUsers->fetchAll(PDO::FETCH_ASSOC) as $u) {
+                    $staffMap[intval($u['id'])] = $u;
+                }
+            }
+
             foreach ($projects as &$p) {
                 $p['progress_pct'] = $p['total_tasks'] > 0 ? round(($p['completed_tasks'] / $p['total_tasks']) * 100) : 0;
+                $pid = intval($p['id']);
+
+                // Services
+                $stS = $db->prepare("SELECT * FROM project_services WHERE project_id = ? AND (status IS NULL OR status != 'Deleted') ORDER BY id ASC");
+                $stS->execute([$pid]);
+                $srvList = $stS->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($srvList as &$sv) {
+                    $aIds = json_decode($sv['assignees_json'] ?? '[]', true) ?: [];
+                    $sv['assignee_ids'] = $aIds;
+                    $sv['assignees'] = array_values(array_filter(array_map(function ($aid) use ($staffMap) {
+                        return $staffMap[$aid] ?? null;
+                    }, $aIds)));
+                }
+                $p['services'] = $srvList;
+
+                // Tasks
+                $stT = $db->prepare("
+                    SELECT t.id, t.task_code, t.title, t.project_id, t.service_id, t.priority, t.status, t.deadline,
+                           t.task_type, t.parent_task_id, t.assignees_json,
+                           u.full_name as assigned_to_name, ps.service_name,
+                           (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.is_deleted = 0) as subtasks_count
+                    FROM tasks t
+                    LEFT JOIN users u ON t.assigned_to = u.id
+                    LEFT JOIN project_services ps ON t.service_id = ps.id
+                    WHERE t.project_id = ? AND t.is_deleted = 0
+                    ORDER BY 
+                        CASE 
+                            WHEN t.status = 'SENT FOR CLIENT APPROVAL' THEN 1
+                            WHEN t.status = 'IN PROGRESS' THEN 2
+                            WHEN t.status = 'UNDER REVIEW' THEN 3
+                            WHEN t.status = 'PENDING' THEN 4
+                            ELSE 5
+                        END,
+                        t.id DESC
+                ");
+                $stT->execute([$pid]);
+                $p['tasks'] = $stT->fetchAll(PDO::FETCH_ASSOC);
             }
 
             // Action Required Tasks
@@ -65,6 +110,34 @@ try {
             $stmtAct->execute([$clientId]);
             $recentActivities = $stmtAct->fetchAll();
 
+            // Client Monthly Strategy & Deliverables Plan
+            $curMonth = date('Y-m');
+            $stPlan = $db->prepare("SELECT * FROM client_monthly_plans WHERE client_id = ? AND month = ?");
+            $stPlan->execute([$clientId, $curMonth]);
+            $planRow = $stPlan->fetch(PDO::FETCH_ASSOC);
+            if (!$planRow) {
+                // If current month doesn't exist, get latest plan for this client
+                $stPlanLatest = $db->prepare("SELECT * FROM client_monthly_plans WHERE client_id = ? ORDER BY month DESC LIMIT 1");
+                $stPlanLatest->execute([$clientId]);
+                $planRow = $stPlanLatest->fetch(PDO::FETCH_ASSOC);
+            }
+            if ($planRow) {
+                $planRow['columns'] = json_decode($planRow['columns_json'] ?? '[]', true) ?: [];
+                $planRow['rows'] = json_decode($planRow['rows_json'] ?? '[]', true) ?: [];
+                $paidAmount = floatval($planRow['paid_amount'] ?? ($planRow['budget'] ?? 0));
+                $allocations = json_decode($planRow['platform_allocations_json'] ?? '[]', true) ?: [];
+                $totalAllocated = 0;
+                foreach ($allocations as $al) {
+                    $totalAllocated += floatval($al['amount'] ?? 0);
+                }
+                $currentBalance = $paidAmount - $totalAllocated;
+                $planRow['paid_amount'] = $paidAmount;
+                $planRow['platform_allocations'] = $allocations;
+                $planRow['total_allocated'] = $totalAllocated;
+                $planRow['current_balance'] = $currentBalance;
+                $planRow['remaining_balance'] = $currentBalance;
+            }
+
             echo json_encode([
                 'success' => true,
                 'metrics' => [
@@ -76,8 +149,38 @@ try {
                 'projects' => $projects,
                 'pending_action_tasks' => $pendingActionTasks,
                 'upcoming_meetings' => $upcomingMeetings,
-                'recent_activities' => $recentActivities
+                'recent_activities' => $recentActivities,
+                'monthly_plan' => $planRow
             ]);
+            break;
+
+        case 'get_monthly_plan':
+            $month = trim($_GET['month'] ?? date('Y-m'));
+            $stPlan = $db->prepare("SELECT * FROM client_monthly_plans WHERE client_id = ? AND month = ?");
+            $stPlan->execute([$clientId, $month]);
+            $planRow = $stPlan->fetch(PDO::FETCH_ASSOC);
+            if (!$planRow) {
+                $stPlanLatest = $db->prepare("SELECT * FROM client_monthly_plans WHERE client_id = ? ORDER BY month DESC LIMIT 1");
+                $stPlanLatest->execute([$clientId]);
+                $planRow = $stPlanLatest->fetch(PDO::FETCH_ASSOC);
+            }
+            if ($planRow) {
+                $planRow['columns'] = json_decode($planRow['columns_json'] ?? '[]', true) ?: [];
+                $planRow['rows'] = json_decode($planRow['rows_json'] ?? '[]', true) ?: [];
+                $paidAmount = floatval($planRow['paid_amount'] ?? ($planRow['budget'] ?? 0));
+                $allocations = json_decode($planRow['platform_allocations_json'] ?? '[]', true) ?: [];
+                $totalAllocated = 0;
+                foreach ($allocations as $al) {
+                    $totalAllocated += floatval($al['amount'] ?? 0);
+                }
+                $currentBalance = $paidAmount - $totalAllocated;
+                $planRow['paid_amount'] = $paidAmount;
+                $planRow['platform_allocations'] = $allocations;
+                $planRow['total_allocated'] = $totalAllocated;
+                $planRow['current_balance'] = $currentBalance;
+                $planRow['remaining_balance'] = $currentBalance;
+            }
+            echo json_encode(['success' => true, 'plan' => $planRow]);
             break;
 
         case 'get_projects':
@@ -90,8 +193,43 @@ try {
             $stmt->execute([$clientId]);
             $projects = $stmt->fetchAll();
 
+            $staffMapP = [];
+            $stUsersP = $db->query("SELECT id, full_name, department FROM users");
+            if ($stUsersP) {
+                foreach ($stUsersP->fetchAll(PDO::FETCH_ASSOC) as $u) {
+                    $staffMapP[intval($u['id'])] = $u;
+                }
+            }
+
             foreach ($projects as &$p) {
                 $p['progress_pct'] = $p['total_tasks'] > 0 ? round(($p['completed_tasks'] / $p['total_tasks']) * 100) : 0;
+                $pid = intval($p['id']);
+
+                $stS = $db->prepare("SELECT * FROM project_services WHERE project_id = ? AND (status IS NULL OR status != 'Deleted') ORDER BY id ASC");
+                $stS->execute([$pid]);
+                $srvList = $stS->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($srvList as &$sv) {
+                    $aIds = json_decode($sv['assignees_json'] ?? '[]', true) ?: [];
+                    $sv['assignee_ids'] = $aIds;
+                    $sv['assignees'] = array_values(array_filter(array_map(function ($aid) use ($staffMapP) {
+                        return $staffMapP[$aid] ?? null;
+                    }, $aIds)));
+                }
+                $p['services'] = $srvList;
+
+                $stT = $db->prepare("
+                    SELECT t.id, t.task_code, t.title, t.project_id, t.service_id, t.priority, t.status, t.deadline,
+                           t.task_type, t.parent_task_id,
+                           u.full_name as assigned_to_name, ps.service_name,
+                           (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.is_deleted = 0) as subtasks_count
+                    FROM tasks t
+                    LEFT JOIN users u ON t.assigned_to = u.id
+                    LEFT JOIN project_services ps ON t.service_id = ps.id
+                    WHERE t.project_id = ? AND t.is_deleted = 0
+                    ORDER BY t.id DESC
+                ");
+                $stT->execute([$pid]);
+                $p['tasks'] = $stT->fetchAll(PDO::FETCH_ASSOC);
             }
 
             echo json_encode(['success' => true, 'projects' => $projects]);
@@ -105,9 +243,40 @@ try {
             $stmtProj->execute([$projectId, $clientId]);
             $project = $stmtProj->fetch();
 
-            $stmtTasks = $db->prepare("SELECT t.* FROM tasks t WHERE t.project_id = ? AND t.client_id = ? AND t.is_deleted = 0 ORDER BY t.id ASC");
+            $staffMapPD = [];
+            $stUsersPD = $db->query("SELECT id, full_name, department FROM users");
+            if ($stUsersPD) {
+                foreach ($stUsersPD->fetchAll(PDO::FETCH_ASSOC) as $u) {
+                    $staffMapPD[intval($u['id'])] = $u;
+                }
+            }
+
+            // Services
+            $stS = $db->prepare("SELECT * FROM project_services WHERE project_id = ? AND (status IS NULL OR status != 'Deleted') ORDER BY id ASC");
+            $stS->execute([$projectId]);
+            $srvList = $stS->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($srvList as &$sv) {
+                $aIds = json_decode($sv['assignees_json'] ?? '[]', true) ?: [];
+                $sv['assignee_ids'] = $aIds;
+                $sv['assignees'] = array_values(array_filter(array_map(function ($aid) use ($staffMapPD) {
+                    return $staffMapPD[$aid] ?? null;
+                }, $aIds)));
+            }
+            $project['services'] = $srvList;
+
+            $stmtTasks = $db->prepare("
+                SELECT t.id, t.task_code, t.title, t.description, t.project_id, t.service_id, t.priority, t.status, t.deadline,
+                       t.task_type, t.parent_task_id,
+                       u.full_name as assigned_to_name, ps.service_name,
+                       (SELECT COUNT(*) FROM tasks st WHERE st.parent_task_id = t.id AND st.is_deleted = 0) as subtasks_count
+                FROM tasks t
+                LEFT JOIN users u ON t.assigned_to = u.id
+                LEFT JOIN project_services ps ON t.service_id = ps.id
+                WHERE t.project_id = ? AND t.client_id = ? AND t.is_deleted = 0
+                ORDER BY t.id ASC
+            ");
             $stmtTasks->execute([$projectId, $clientId]);
-            $tasks = $stmtTasks->fetchAll();
+            $tasks = $stmtTasks->fetchAll(PDO::FETCH_ASSOC);
 
             $totalTasks = count($tasks);
             $completedTasks = 0;
@@ -119,7 +288,7 @@ try {
             $project['completed_tasks'] = $completedTasks;
             $project['progress_pct'] = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100) : 0;
 
-            echo json_encode(['success' => true, 'project' => $project, 'tasks' => $tasks]);
+            echo json_encode(['success' => true, 'project' => $project, 'tasks' => $tasks, 'services' => $srvList]);
             break;
 
         case 'get_tasks':

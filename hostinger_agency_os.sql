@@ -598,6 +598,48 @@ CREATE TABLE `activity_logs` (
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Table: client_monthly_plans
+CREATE TABLE IF NOT EXISTS `client_monthly_plans` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `client_id` INT NOT NULL,
+  `month` VARCHAR(10) NOT NULL,
+  `title` VARCHAR(200) DEFAULT 'Monthly Strategy & Deliverables Plan',
+  `columns_json` TEXT DEFAULT NULL,
+  `rows_json` TEXT DEFAULT NULL,
+  `budget` DECIMAL(12, 2) DEFAULT 0.00,
+  `paid_amount` DECIMAL(12, 2) DEFAULT 0.00,
+  `platform_allocations_json` TEXT DEFAULT NULL,
+  `status` VARCHAR(50) DEFAULT 'Active',
+  `notes` TEXT DEFAULT NULL,
+  `created_by` INT DEFAULT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_client_month` (`client_id`, `month`),
+  KEY `idx_cmp_client` (`client_id`),
+  KEY `idx_cmp_month` (`month`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Table: daily_worklogs
+CREATE TABLE IF NOT EXISTS `daily_worklogs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `log_date` DATE NOT NULL,
+  `project_id` INT DEFAULT NULL,
+  `task_id` INT DEFAULT NULL,
+  `work_type` VARCHAR(50) DEFAULT 'General',
+  `hours_spent` DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+  `title` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
+  `reason` TEXT DEFAULT NULL,
+  `challenges` TEXT DEFAULT NULL,
+  `work_link` VARCHAR(255) DEFAULT NULL,
+  `status` VARCHAR(50) DEFAULT 'Completed',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_worklogs_user_date` (`user_id`, `log_date`),
+  INDEX `idx_worklogs_date` (`log_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Table: user_notifications
 CREATE TABLE `user_notifications` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -744,7 +786,7 @@ INSERT INTO `roles` (`id`, `name`, `description`) VALUES
 INSERT INTO `modules` (`id`, `code`, `name`, `description`) VALUES
 (1, 'sales', 'Sales & CRM', 'Manage leads, follow-ups, and sales conversions'),
 (2, 'client-management', 'Client Management', 'Manage client accounts, contracts, and onboarding'),
-(3, 'template-generator', 'Template Generator', 'Generate proposals, quotes, contracts, and invoices'),
+(3, 'template-generator', 'Proposal', 'Generate proposals, quotes, contracts, and invoices'),
 (4, 'task-management', 'Project & Task Management', 'Team Lead assignment, developer work, reviews, and SLAs'),
 (5, 'reports', 'Reports & Analytics', 'Management metrics, revenue, and productivity dashboard'),
 (6, 'client_dashboard', 'Client Dashboard', 'Restricted Client Portal view'),
@@ -2205,5 +2247,23 @@ INSERT INTO `chat_conversations` (`id`, `type`, `title`, `description`, `created
 INSERT INTO `chat_participants` (`id`, `conversation_id`, `user_id`, `role`, `last_read_at`, `joined_at`) VALUES
 (1, 1, 98, 'member', '2026-11-12 06:19:59', '2026-11-12 05:19:57'),
 (2, 1, 71, 'member', NULL, '2026-11-12 05:19:57');
+
+-- --------------------------------------------------------
+-- Table structure for table `project_services`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `project_services` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `project_id` int(11) NOT NULL,
+  `client_id` int(11) NOT NULL,
+  `service_name` varchar(150) NOT NULL,
+  `description` text DEFAULT NULL,
+  `assignees_json` text DEFAULT NULL,
+  `status` varchar(50) DEFAULT 'Active',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_proj_services_proj` (`project_id`),
+  KEY `idx_proj_services_client` (`client_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS=1;

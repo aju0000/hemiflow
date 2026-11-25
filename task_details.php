@@ -70,17 +70,14 @@ require_once __DIR__ . '/header.php';
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:15px; border-top:1px solid var(--border);">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <label style="font-size:13px; font-weight:700; color:#0f172a;">Change Status:</label>
-                    <select id="quickStatusSelect" class="form-select" onchange="updateTaskStatusFromDetails(this.value)" style="font-weight:700; max-width:230px;">
                     <select id="quickStatusSelect" class="form-select" onchange="updateTaskStatusFromDetails(this.value)" style="font-weight:700; max-width:250px;">
                         <option value="PENDING">⏳ PENDING</option>
                         <option value="IN PROGRESS">⚡ IN PROGRESS</option>
                         <option value="UNDER REVIEW">🔍 UNDER REVIEW</option>
-                        <?php if ($canManageThisTask): ?>
-                            <option value="PENDING LEAD APPROVAL">📝 PENDING LEAD APPROVAL</option>
-                            <option value="REVISION REQUIRED">🔄 REVISION REQUIRED</option>
-                            <option value="SENT FOR CLIENT APPROVAL">📩 SENT FOR CLIENT APPROVAL</option>
-                            <option value="COMPLETED">✅ COMPLETED</option>
-                        <?php endif; ?>
+                        <option value="PENDING LEAD APPROVAL">📝 PENDING LEAD APPROVAL</option>
+                        <option value="REVISION REQUIRED">🔄 REVISION REQUIRED</option>
+                        <option value="SENT FOR CLIENT APPROVAL">📩 SENT FOR CLIENT APPROVAL</option>
+                        <option value="COMPLETED">✅ COMPLETED</option>
                     </select>
                 </div>
 
